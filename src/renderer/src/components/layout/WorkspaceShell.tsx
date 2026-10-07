@@ -16,26 +16,26 @@ export const WorkspaceShell: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-stone-950 text-stone-400 text-xs font-mono">
-        正在装载 Explosion 创作工作台...
+      <div className="h-screen w-screen flex items-center justify-center bg-[#fbfbfa] text-stone-500 text-xs font-mono">
+        加载中...
       </div>
     )
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-stone-950 text-stone-100 overflow-hidden font-sans">
+    <div className="h-screen w-screen flex flex-col bg-[#fbfbfa] text-stone-900 overflow-hidden font-sans">
       {/* Top Title Bar */}
       <TitleBar />
 
       {/* Main Three-Column Workspace */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Column: Chapters Tree & Story Outlines & Library */}
+        {/* Left Column: Chapters & Library */}
         <LeftSidebar />
 
         {/* Center Column: Pure-Text Manuscript Editor */}
         <EditorCenter />
 
-        {/* Right Column: Multi-Agent Collaboration Panel */}
+        {/* Right Column: Assistant Collaboration Panel */}
         <RightPanel />
       </div>
 

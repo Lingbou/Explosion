@@ -8,10 +8,16 @@
     margin: 0;
     padding: 0;
     overflow: hidden;
-    background-color: #0c0a09;
-    color: #f5f5f4;
+    background-color: #fbfbfa;
+    color: #1c1917;
     user-select: none;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: #e7e5e4;
+    color: #1c1917;
   }
 }
 
@@ -25,12 +31,12 @@
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #292524;
+  background: #e7e5e4;
   border-radius: 9999px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: #44403c;
+  background: #d6d3d1;
 }
 
 .scrollbar-none::-webkit-scrollbar {
