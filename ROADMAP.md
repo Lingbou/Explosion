@@ -107,7 +107,7 @@ my-novel-project/
 ### 3. 多协议支持与首次启动向导（Onboarding）
 * 启动无有效配置时主动呼出向导蒙层；
 * 支持从上游端点一键拉取可用模型列表（兼容 OpenAI `/v1/models`、Anthropic `/v1/models`、Ollama `/api/tags`），并提供可编辑 Combobox 兼顾手动输入回退；
-* 支持将不同模型灵活指派给“主笔”与“Sub-agent 审校”。
+* 单一主力模型全局驱动：零角色绑定心智负担，主笔与各独立 Sub-agent 共享同一顶尖模型，凭借专属 Prompt 与隔离上下文各司其职。
 
 ---
 
@@ -121,10 +121,12 @@ my-novel-project/
   - 预设主流模板（DeepSeek、SiliconFlow、Anthropic、OpenAI、Ollama、OpenRouter、自定义）。
   - 统一支持三大主流 API 协议：OpenAI Chat Completions、OpenAI Responses、Anthropic Messages。
   - 上游模型动态拉取与自由输入双模态。
-  - 角色模型绑定（主笔 / 审校）。
+  - 单一主力模型驱动架构（主笔与并发 Sub-agent 共享同一模型，零配置冗余）。
 - [ ] 搭建三栏式核心工作区布局框架。
 
 ### 阶段 1：纯文本手稿编辑器与排版系统 (M1 - Pure-Text Editor)
+- [ ] 真实本地文件直通（Direct File System Binding）：
+  - 编辑器直接读写磁盘 `.txt` 真实手稿，零中间数据库转存，完全透明无负担。
 - [ ] 研发专注纯文本的轻量编辑器组件：
   - 严格禁止 Markdown 语法渲染标签（无 `#`、`**`、`>` 污染）。
   - 中文标准排版（段首自动缩进两个全角空格、段落间空行控制）。
