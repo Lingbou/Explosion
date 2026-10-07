@@ -9,15 +9,64 @@ import {
   TestConnectionResult
 } from './llm'
 
+export interface ProjectChapterFile {
+  id: string
+  title: string
+  content: string
+  filename: string
+  updatedAt: number
+}
+
+export interface ProjectData {
+  path: string
+  title: string
+  chapters: ProjectChapterFile[]
+  activeChapterId?: string
+}
+
+export interface LibraryBook {
+  filename: string
+  path: string
+  size: number
+  updatedAt: number
+}
+
+export interface LibraryBookContent {
+  filename: string
+  content: string
+  size: number
+}
+
 export const IPC_CHANNELS = {
+  // Config
   CONFIG_GET: 'config:get',
   CONFIG_SAVE: 'config:save',
   CONFIG_RESET: 'config:reset',
+
+  // LLM
   LLM_TEST_CONNECTION: 'llm:test-connection',
   LLM_FETCH_MODELS: 'llm:fetch-models',
   LLM_GENERATE: 'llm:generate',
   LLM_GENERATE_STREAM: 'llm:generate-stream',
   LLM_ABORT_STREAM: 'llm:abort-stream',
+
+  // Project Management
+  PROJECT_OPEN_DIALOG: 'project:open-dialog',
+  PROJECT_CREATE_DIALOG: 'project:create-dialog',
+  PROJECT_LOAD: 'project:load',
+  PROJECT_SAVE_CHAPTER: 'project:save-chapter',
+  PROJECT_RENAME_CHAPTER: 'project:rename-chapter',
+  PROJECT_DELETE_CHAPTER: 'project:delete-chapter',
+  PROJECT_SAVE_META: 'project:save-meta',
+
+  // Material Library
+  LIBRARY_LIST: 'library:list',
+  LIBRARY_IMPORT: 'library:import',
+  LIBRARY_OPEN_FOLDER: 'library:open-folder',
+  LIBRARY_READ_CONTENT: 'library:read-content',
+  LIBRARY_DELETE: 'library:delete',
+
+  // App Utilities
   APP_GET_PATHS: 'app:get-paths',
   APP_COPY_TEXT: 'app:copy-text'
 } as const
@@ -25,9 +74,12 @@ export const IPC_CHANNELS = {
 export type IpcChannelName = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
 
 export interface ElectronApi {
+  // Config
   getConfig: () => Promise<AppConfig>
   saveConfig: (config: AppConfig) => Promise<{ success: boolean; config: AppConfig }>
   resetConfig: () => Promise<AppConfig>
+
+  // LLM
   testConnection: (params: TestConnectionParams) => Promise<TestConnectionResult>
   fetchModels: (params: FetchModelsParams) => Promise<FetchModelsResult>
   generate: (params: LLMGenerateOptions) => Promise<LLMGenerateResult>
@@ -36,6 +88,39 @@ export interface ElectronApi {
     onChunk: (chunk: LLMStreamChunk) => void
   ) => { requestId: string; unsubscribe: () => void }
   abortStream: (requestId: string) => Promise<boolean>
+
+  // Project Management
+  openProjectDialog: () => Promise<string | null>
+  createProjectDialog: () => Promise<string | null>
+  loadProject: (projectPath: string) => Promise<ProjectData>
+  saveProjectChapter: (params: {
+    projectPath: string
+    chapter: ProjectChapterFile
+  }) => Promise<boolean>
+  renameProjectChapter: (params: {
+    projectPath: string
+    chapterId: string
+    oldFilename: string
+    newTitle: string
+  }) => Promise<{ success: boolean; newFilename: string }>
+  deleteProjectChapter: (params: {
+    projectPath: string
+    filename: string
+  }) => Promise<boolean>
+  saveProjectMeta: (params: { projectPath: string; title: string }) => Promise<boolean>
+
+  // Library
+  listLibraryFiles: () => Promise<LibraryBook[]>
+  importLibraryFiles: () => Promise<{
+    success: boolean
+    importedCount: number
+    books: LibraryBook[]
+  }>
+  openLibraryFolder: () => Promise<boolean>
+  readLibraryFileContent: (filename: string) => Promise<LibraryBookContent>
+  deleteLibraryFile: (filename: string) => Promise<boolean>
+
+  // App Utilities
   getAppPaths: () => Promise<AppPaths>
   copyText: (text: string) => Promise<boolean>
 }

@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
-import { IPC_CHANNELS, ElectronApi } from '../shared/types/ipc'
+import {
+  IPC_CHANNELS,
+  ElectronApi,
+  ProjectData,
+  ProjectChapterFile,
+  LibraryBook,
+  LibraryBookContent
+} from '../shared/types/ipc'
 import { AppConfig, AppPaths } from '../shared/types/config'
 import {
   FetchModelsParams,
@@ -12,6 +19,7 @@ import {
 } from '../shared/types/llm'
 
 const api: ElectronApi = {
+  // Config
   getConfig: (): Promise<AppConfig> => ipcRenderer.invoke(IPC_CHANNELS.CONFIG_GET),
 
   saveConfig: (config: AppConfig): Promise<{ success: boolean; config: AppConfig }> =>
@@ -19,6 +27,7 @@ const api: ElectronApi = {
 
   resetConfig: (): Promise<AppConfig> => ipcRenderer.invoke(IPC_CHANNELS.CONFIG_RESET),
 
+  // LLM
   testConnection: (params: TestConnectionParams): Promise<TestConnectionResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.LLM_TEST_CONNECTION, params),
 
@@ -41,7 +50,6 @@ const api: ElectronApi = {
 
     ipcRenderer.on(channel, listener)
 
-    // Trigger main process stream handler
     ipcRenderer.invoke(IPC_CHANNELS.LLM_GENERATE_STREAM, { options, requestId }).catch((err) => {
       onChunk({
         requestId,
@@ -62,6 +70,57 @@ const api: ElectronApi = {
   abortStream: (requestId: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.LLM_ABORT_STREAM, requestId),
 
+  // Project Management
+  openProjectDialog: (): Promise<string | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_OPEN_DIALOG),
+
+  createProjectDialog: (): Promise<string | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_CREATE_DIALOG),
+
+  loadProject: (projectPath: string): Promise<ProjectData> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_LOAD, projectPath),
+
+  saveProjectChapter: (params: {
+    projectPath: string
+    chapter: ProjectChapterFile
+  }): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_SAVE_CHAPTER, params),
+
+  renameProjectChapter: (params: {
+    projectPath: string
+    chapterId: string
+    oldFilename: string
+    newTitle: string
+  }): Promise<{ success: boolean; newFilename: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_RENAME_CHAPTER, params),
+
+  deleteProjectChapter: (params: {
+    projectPath: string
+    filename: string
+  }): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_DELETE_CHAPTER, params),
+
+  saveProjectMeta: (params: { projectPath: string; title: string }): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_SAVE_META, params),
+
+  // Library
+  listLibraryFiles: (): Promise<LibraryBook[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LIBRARY_LIST),
+
+  importLibraryFiles: (): Promise<{
+    success: boolean
+    importedCount: number
+    books: LibraryBook[]
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LIBRARY_IMPORT),
+
+  openLibraryFolder: (): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LIBRARY_OPEN_FOLDER),
+
+  readLibraryFileContent: (filename: string): Promise<LibraryBookContent> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LIBRARY_READ_CONTENT, filename),
+
+  deleteLibraryFile: (filename: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LIBRARY_DELETE, filename),
+
+  // App Utilities
   getAppPaths: (): Promise<AppPaths> => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_PATHS),
 
   copyText: (text: string): Promise<boolean> =>

@@ -10,7 +10,11 @@ import { useAgentStore } from '../../store/agentStore'
 import { useConfigStore } from '../../store/configStore'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 
-export const RightPanel: React.FC = () => {
+interface RightPanelProps {
+  width: number
+}
+
+export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
   const {
     messages,
     isStreaming,
@@ -49,9 +53,12 @@ export const RightPanel: React.FC = () => {
   }
 
   return (
-    <aside className="w-80 border-l border-stone-200 bg-white flex flex-col justify-between select-none">
+    <aside
+      style={{ width: `${width}px` }}
+      className="border-l border-stone-200 bg-white flex flex-col justify-between select-none shrink-0 overflow-hidden"
+    >
       {/* Top Header: Quiet Assistant Label & Model */}
-      <div className="h-11 px-4 border-b border-stone-200 flex items-center justify-between bg-white">
+      <div className="h-10 px-4 border-b border-stone-200 flex items-center justify-between bg-white">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-xs text-stone-800">写作助手</span>
           <span className="text-[10px] font-mono text-stone-400 truncate max-w-[140px]">

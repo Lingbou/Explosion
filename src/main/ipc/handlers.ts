@@ -1,5 +1,5 @@
-import { ipcMain, clipboard } from 'electron'
-import { IPC_CHANNELS } from '../../shared/types/ipc'
+import { ipcMain, clipboard, BrowserWindow } from 'electron'
+import { IPC_CHANNELS, ProjectChapterFile } from '../../shared/types/ipc'
 import { AppConfig } from '../../shared/types/config'
 import {
   FetchModelsParams,
@@ -8,6 +8,8 @@ import {
 } from '../../shared/types/llm'
 import { globalConfigStore } from '../config/store'
 import { globalLLMAdapter } from '../llm/adapter'
+import { globalProjectManager } from '../project/manager'
+import { globalLibraryManager } from '../library/manager'
 
 export function registerIpcHandlers(): void {
   // Config Handlers
@@ -67,6 +69,95 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.LLM_ABORT_STREAM, async (_event, requestId: string) => {
     return globalLLMAdapter.abortStream(requestId)
+  })
+
+  // Project Management Handlers
+  ipcMain.handle(IPC_CHANNELS.PROJECT_OPEN_DIALOG, async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    return globalProjectManager.openProjectDialog(win)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.PROJECT_CREATE_DIALOG, async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    return globalProjectManager.createProjectDialog(win)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.PROJECT_LOAD, async (_event, projectPath: string) => {
+    return globalProjectManager.loadProject(projectPath)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_SAVE_CHAPTER,
+    async (
+      _event,
+      { projectPath, chapter }: { projectPath: string; chapter: ProjectChapterFile }
+    ) => {
+      return globalProjectManager.saveProjectChapter(projectPath, chapter)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_RENAME_CHAPTER,
+    async (
+      _event,
+      {
+        projectPath,
+        chapterId,
+        oldFilename,
+        newTitle
+      }: {
+        projectPath: string
+        chapterId: string
+        oldFilename: string
+        newTitle: string
+      }
+    ) => {
+      return globalProjectManager.renameProjectChapter(
+        projectPath,
+        chapterId,
+        oldFilename,
+        newTitle
+      )
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_DELETE_CHAPTER,
+    async (
+      _event,
+      { projectPath, filename }: { projectPath: string; filename: string }
+    ) => {
+      return globalProjectManager.deleteProjectChapter(projectPath, filename)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_SAVE_META,
+    async (_event, { projectPath, title }: { projectPath: string; title: string }) => {
+      return globalProjectManager.saveProjectMeta(projectPath, title)
+    }
+  )
+
+  // Library Handlers
+  ipcMain.handle(IPC_CHANNELS.LIBRARY_LIST, async () => {
+    return globalLibraryManager.listLibraryFiles()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.LIBRARY_IMPORT, async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    return globalLibraryManager.importLibraryFiles(win)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.LIBRARY_OPEN_FOLDER, async () => {
+    return globalLibraryManager.openLibraryFolder()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.LIBRARY_READ_CONTENT, async (_event, filename: string) => {
+    return globalLibraryManager.readLibraryFileContent(filename)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.LIBRARY_DELETE, async (_event, filename: string) => {
+    return globalLibraryManager.deleteLibraryFile(filename)
   })
 
   // App Utilities

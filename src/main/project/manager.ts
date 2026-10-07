@@ -1,0 +1,197 @@
+import * as fs from 'fs'
+import * as path from 'path'
+import { BrowserWindow, dialog } from 'electron'
+import { ProjectChapterFile, ProjectData } from '../../shared/types/ipc'
+import { globalConfigStore } from '../config/store'
+
+export class ProjectManager {
+  public async openProjectDialog(window?: BrowserWindow | null): Promise<string | null> {
+    const res = await dialog.showOpenDialog(window || undefined as any, {
+      title: '打开小说工程文件夹',
+      properties: ['openDirectory']
+    })
+
+    if (res.canceled || res.filePaths.length === 0) {
+      return null
+    }
+
+    return res.filePaths[0]
+  }
+
+  public async createProjectDialog(window?: BrowserWindow | null): Promise<string | null> {
+    const res = await dialog.showOpenDialog(window || undefined as any, {
+      title: '新建或选择小说工程文件夹',
+      properties: ['openDirectory', 'createDirectory']
+    })
+
+    if (res.canceled || res.filePaths.length === 0) {
+      return null
+    }
+
+    return res.filePaths[0]
+  }
+
+  public async loadProject(projectPath: string): Promise<ProjectData> {
+    if (!fs.existsSync(projectPath)) {
+      fs.mkdirSync(projectPath, { recursive: true })
+    }
+
+    const manuscriptDir = path.join(projectPath, 'manuscript')
+    const storyDir = path.join(projectPath, 'story')
+    const metaDir = path.join(projectPath, '.explosion')
+
+    if (!fs.existsSync(manuscriptDir)) fs.mkdirSync(manuscriptDir, { recursive: true })
+    if (!fs.existsSync(storyDir)) fs.mkdirSync(storyDir, { recursive: true })
+    if (!fs.existsSync(metaDir)) fs.mkdirSync(metaDir, { recursive: true })
+
+    const metaFile = path.join(metaDir, 'project.json')
+    let title = path.basename(projectPath)
+    let activeChapterId: string | undefined
+
+    if (fs.existsSync(metaFile)) {
+      try {
+        const raw = fs.readFileSync(metaFile, 'utf-8')
+        const meta = JSON.parse(raw)
+        if (meta.title) title = meta.title
+        if (meta.activeChapterId) activeChapterId = meta.activeChapterId
+      } catch {
+        // ignore json error
+      }
+    } else {
+      fs.writeFileSync(metaFile, JSON.stringify({ title, createdAt: Date.now() }, null, 2), 'utf-8')
+    }
+
+    // Read chapters from manuscript/
+    const files = fs.readdirSync(manuscriptDir)
+    const txtFiles = files
+      .filter((f) => f.endsWith('.txt') && !f.startsWith('.'))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+
+    const chapters: ProjectChapterFile[] = []
+
+    if (txtFiles.length === 0) {
+      // Initialize with first blank chapter
+      const defaultFilename = '001-第一章.txt'
+      const defaultFilePath = path.join(manuscriptDir, defaultFilename)
+      fs.writeFileSync(defaultFilePath, '', 'utf-8')
+
+      chapters.push({
+        id: 'ch-1',
+        title: '第一章',
+        content: '',
+        filename: defaultFilename,
+        updatedAt: Date.now()
+      })
+    } else {
+      txtFiles.forEach((file, index) => {
+        const filePath = path.join(manuscriptDir, file)
+        let content = ''
+        try {
+          content = fs.readFileSync(filePath, 'utf-8')
+        } catch {
+          // Fallback if encoding issues
+          content = ''
+        }
+
+        const stat = fs.statSync(filePath)
+        // Clean title from filename (strip "001-" or extension)
+        let cleanTitle = path.basename(file, '.txt')
+        const match = cleanTitle.match(/^\d+-(.+)$/)
+        if (match) {
+          cleanTitle = match[1]
+        }
+
+        chapters.push({
+          id: `ch-${index + 1}`,
+          title: cleanTitle,
+          content,
+          filename: file,
+          updatedAt: stat.mtimeMs
+        })
+      })
+    }
+
+    // Persist last opened project in app config
+    const currentConfig = globalConfigStore.getConfig()
+    currentConfig.workspace.lastProjectPath = projectPath
+    globalConfigStore.saveConfig(currentConfig)
+
+    return {
+      path: projectPath,
+      title,
+      chapters,
+      activeChapterId: activeChapterId || chapters[0].id
+    }
+  }
+
+  public saveProjectChapter(
+    projectPath: string,
+    chapter: ProjectChapterFile
+  ): boolean {
+    const manuscriptDir = path.join(projectPath, 'manuscript')
+    if (!fs.existsSync(manuscriptDir)) {
+      fs.mkdirSync(manuscriptDir, { recursive: true })
+    }
+
+    const filePath = path.join(manuscriptDir, chapter.filename)
+    fs.writeFileSync(filePath, chapter.content || '', 'utf-8')
+    return true
+  }
+
+  public renameProjectChapter(
+    projectPath: string,
+    chapterId: string,
+    oldFilename: string,
+    newTitle: string
+  ): { success: boolean; newFilename: string } {
+    const manuscriptDir = path.join(projectPath, 'manuscript')
+    const oldPath = path.join(manuscriptDir, oldFilename)
+
+    // Preserve number prefix if existing filename has "001-"
+    const prefixMatch = oldFilename.match(/^(\d+-)/)
+    const prefix = prefixMatch ? prefixMatch[1] : ''
+    const safeTitle = newTitle.replace(/[\\/:*?"<>|]/g, '_')
+    const newFilename = `${prefix}${safeTitle}.txt`
+    const newPath = path.join(manuscriptDir, newFilename)
+
+    if (fs.existsSync(oldPath)) {
+      if (oldPath !== newPath) {
+        fs.renameSync(oldPath, newPath)
+      }
+    } else {
+      fs.writeFileSync(newPath, '', 'utf-8')
+    }
+
+    return { success: true, newFilename }
+  }
+
+  public deleteProjectChapter(projectPath: string, filename: string): boolean {
+    const manuscriptDir = path.join(projectPath, 'manuscript')
+    const filePath = path.join(manuscriptDir, filename)
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath)
+    }
+    return true
+  }
+
+  public saveProjectMeta(projectPath: string, title: string): boolean {
+    const metaDir = path.join(projectPath, '.explosion')
+    if (!fs.existsSync(metaDir)) fs.mkdirSync(metaDir, { recursive: true })
+    const metaFile = path.join(metaDir, 'project.json')
+
+    let data: Record<string, unknown> = {}
+    if (fs.existsSync(metaFile)) {
+      try {
+        data = JSON.parse(fs.readFileSync(metaFile, 'utf-8'))
+      } catch {
+        // ignore
+      }
+    }
+    data.title = title
+    data.updatedAt = Date.now()
+    fs.writeFileSync(metaFile, JSON.stringify(data, null, 2), 'utf-8')
+    return true
+  }
+}
+
+export const globalProjectManager = new ProjectManager()

@@ -19,7 +19,8 @@ function createWindow(): void {
     minHeight: 700,
     show: false,
     autoHideMenuBar: true,
-    titleBarStyle: 'hiddenInset',
+    title: 'Explosion - 现代小说创作工作台',
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' } : {}),
     backgroundColor: '#fbfbfa',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
