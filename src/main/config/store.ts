@@ -59,7 +59,7 @@ export class ConfigStore {
   public saveConfig(config: AppConfig): AppConfig {
     this.ensureDirectories()
     this.currentConfig = this.mergeWithDefault(config)
-    const tempFile = `${this.configFile}.${Date.now()}.tmp`
+    const tempFile = `${this.configFile}.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`
     fs.writeFileSync(tempFile, JSON.stringify(this.currentConfig, null, 2), 'utf-8')
     fs.renameSync(tempFile, this.configFile)
     return this.currentConfig
