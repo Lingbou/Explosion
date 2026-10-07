@@ -3,6 +3,12 @@ import { join } from 'path'
 import { globalConfigStore } from './config/store'
 import { registerIpcHandlers } from './ipc/handlers'
 
+// Linux desktop stability: disable hardware acceleration if needed or add fallback flags
+if (process.platform === 'linux') {
+  app.disableHardwareAcceleration()
+  app.commandLine.appendSwitch('no-sandbox')
+}
+
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
