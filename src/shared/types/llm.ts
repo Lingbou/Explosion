@@ -1,8 +1,31 @@
 import { LLMProtocol } from './config'
 
+export interface ToolDefinition {
+  type?: 'function'
+  name: string
+  description: string
+  parameters: Record<string, unknown>
+}
+
+export interface ToolCall {
+  id: string
+  type?: 'function'
+  name: string
+  arguments: string
+}
+
+export interface ToolCallDelta {
+  index: number
+  id?: string
+  name?: string
+  argumentsDelta?: string
+}
+
 export interface LLMMessage {
-  role: 'system' | 'user' | 'assistant'
-  content: string
+  role: 'system' | 'user' | 'assistant' | 'tool'
+  content: string | null
+  tool_calls?: ToolCall[]
+  tool_call_id?: string
 }
 
 export interface LLMUsage {
@@ -18,6 +41,7 @@ export interface LLMGenerateOptions {
   maxTokens?: number
   topP?: number
   stream?: boolean
+  tools?: ToolDefinition[]
 }
 
 export interface LLMGenerateResult {
@@ -25,6 +49,7 @@ export interface LLMGenerateResult {
   reasoning?: string
   model: string
   usage?: LLMUsage
+  toolCalls?: ToolCall[]
 }
 
 export interface LLMStreamChunk {
@@ -34,6 +59,8 @@ export interface LLMStreamChunk {
   done: boolean
   error?: string
   usage?: LLMUsage
+  toolCalls?: ToolCall[]
+  toolCallDelta?: ToolCallDelta
 }
 
 export interface TestConnectionParams {

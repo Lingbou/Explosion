@@ -1,18 +1,20 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { BrowserWindow, dialog } from 'electron'
-import { ProjectChapterFile, ProjectData } from '../../shared/types/ipc'
+import { IPC_CHANNELS, ProjectChapterFile, ProjectData, ProjectFileChangedPayload } from '../../shared/types/ipc'
 import { ConfigStore, globalConfigStore } from '../config/store'
 
 export class ProjectManager {
   private configStore: ConfigStore
+  private activeWatcher: fs.FSWatcher | null = null
+  private watcherDebounceTimers = new Map<string, NodeJS.Timeout>()
 
   constructor(configStore?: ConfigStore) {
     this.configStore = configStore || globalConfigStore
   }
 
   public async openProjectDialog(window?: BrowserWindow | null): Promise<string | null> {
-    const res = await dialog.showOpenDialog(window || undefined as any, {
+    const res = await dialog.showOpenDialog(window || (undefined as any), {
       title: '打开小说工程文件夹',
       properties: ['openDirectory']
     })
@@ -25,7 +27,7 @@ export class ProjectManager {
   }
 
   public async createProjectDialog(window?: BrowserWindow | null): Promise<string | null> {
-    const res = await dialog.showOpenDialog(window || undefined as any, {
+    const res = await dialog.showOpenDialog(window || (undefined as any), {
       title: '新建或选择小说工程文件夹',
       properties: ['openDirectory', 'createDirectory']
     })
@@ -35,6 +37,74 @@ export class ProjectManager {
     }
 
     return res.filePaths[0]
+  }
+
+  public closeWatcher(): void {
+    if (this.activeWatcher) {
+      try {
+        this.activeWatcher.close()
+      } catch {
+        // ignore
+      }
+      this.activeWatcher = null
+    }
+    for (const timer of this.watcherDebounceTimers.values()) {
+      clearTimeout(timer)
+    }
+    this.watcherDebounceTimers.clear()
+  }
+
+  private startWatchingManuscript(projectPath: string): void {
+    this.closeWatcher()
+
+    const manuscriptDir = path.join(projectPath, 'manuscript')
+    if (!fs.existsSync(manuscriptDir)) return
+
+    try {
+      this.activeWatcher = fs.watch(manuscriptDir, (_eventType, filename) => {
+        if (!filename || !filename.endsWith('.txt')) return
+
+        const existingTimer = this.watcherDebounceTimers.get(filename)
+        if (existingTimer) clearTimeout(existingTimer)
+
+        const timer = setTimeout(() => {
+          this.watcherDebounceTimers.delete(filename)
+          const filePath = path.join(manuscriptDir, filename)
+          let content = ''
+          if (fs.existsSync(filePath)) {
+            try {
+              content = fs.readFileSync(filePath, 'utf-8')
+            } catch {
+              content = ''
+            }
+          }
+
+          const payload: ProjectFileChangedPayload = {
+            projectPath,
+            filePath,
+            filename,
+            content
+          }
+
+          try {
+            const wins = (BrowserWindow && typeof BrowserWindow.getAllWindows === 'function')
+              ? BrowserWindow.getAllWindows()
+              : []
+            for (const win of wins) {
+              if (!win.isDestroyed()) {
+                win.webContents.send(IPC_CHANNELS.PROJECT_FILE_CHANGED, payload)
+              }
+            }
+          } catch {
+            // ignore during unit tests
+          }
+        }, 150)
+
+        this.watcherDebounceTimers.set(filename, timer)
+      })
+    } catch {
+      // ignore watch failures on some file systems
+    }
   }
 
   public async loadProject(projectPath: string): Promise<ProjectData> {
@@ -122,6 +192,9 @@ export class ProjectManager {
     currentConfig.workspace.lastProjectPath = projectPath
     this.configStore.saveConfig(currentConfig)
 
+    // Watch manuscript/ for live file sync
+    this.startWatchingManuscript(projectPath)
+
     return {
       path: projectPath,
       title,
@@ -131,6 +204,7 @@ export class ProjectManager {
   }
 
   public closeCurrentProject(): boolean {
+    this.closeWatcher()
     const currentConfig = this.configStore.getConfig()
     currentConfig.workspace.lastProjectPath = null
     this.configStore.saveConfig(currentConfig)

@@ -1,142 +1,189 @@
 import { create } from 'zustand'
-import { LLMMessage, LLMStreamChunk } from '../../../shared/types/llm'
-import { stripMarkdownMarks } from '../lib/typography'
+import { AgentStreamEvent, AgentTaskOptions } from '../../../shared/types/ipc'
+
+export interface AgentTraceStep {
+  id: string
+  type: 'tool_call'
+  toolName: string
+  args: Record<string, unknown>
+  result?: string
+  error?: string
+  durationMs?: number
+  status: 'running' | 'success' | 'error'
+  timestamp: number
+}
 
 export interface AgentMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
+  thinking?: string
+  traces?: AgentTraceStep[]
   timestamp: number
 }
 
 interface AgentState {
   messages: AgentMessage[]
-  isStreaming: boolean
-  currentRequestId: string | null
+  isRunning: boolean
+  currentTaskId: string | null
+  currentThinking: string
   currentDelta: string
+  currentTraces: AgentTraceStep[]
   clearMessages: () => void
-  sendMessage: (userPrompt: string, manuscriptContext: string) => Promise<void>
-  abortStreaming: () => void
+  sendTask: (
+    prompt: string,
+    contextParams: {
+      projectPath?: string | null
+      activeChapterFilename?: string | null
+      manuscriptContext?: string
+    }
+  ) => Promise<void>
+  abortTask: () => void
 }
-
-const SYSTEM_PROMPT = `你是一位严谨、克制且具备深厚文学审美的中文小说写作助手。
-你的协作原则：
-1. 【绝对零 Markdown 污染】：输出内容严格保持纯文本，严禁输出任何 Markdown 格式标记（绝对不使用 #、**、*、>、-、反引号或代码块）。输出小说段落时，段首保留全角双空格缩进。
-2. 【文学呼吸感与克制】：注重白描、具体物理动作细节与环境微氛围，拒绝空洞煽情、心理说明与工业网文套话。
-3. 【务实直接】：直接给出针对作者问题的段落生成、描写扩写或具体修改建议，不附带任何废话客套。`
 
 export const useAgentStore = create<AgentState>((set, get) => ({
   messages: [],
-  isStreaming: false,
-  currentRequestId: null,
+  isRunning: false,
+  currentTaskId: null,
+  currentThinking: '',
   currentDelta: '',
+  currentTraces: [],
 
-  clearMessages: () => set({ messages: [] }),
+  clearMessages: () => set({ messages: [], currentThinking: '', currentDelta: '', currentTraces: [] }),
 
-  sendMessage: async (userPrompt: string, manuscriptContext: string) => {
-    const { messages, isStreaming } = get()
-    if (isStreaming || !userPrompt.trim()) return
+  sendTask: async (prompt: string, contextParams) => {
+    const { messages, isRunning } = get()
+    if (isRunning || !prompt.trim()) return
 
     const userMessage: AgentMessage = {
       id: `msg-${Date.now()}-u`,
       role: 'user',
-      content: userPrompt.trim(),
+      content: prompt.trim(),
       timestamp: Date.now()
     }
 
     set({
       messages: [...messages, userMessage],
-      isStreaming: true,
-      currentDelta: ''
+      isRunning: true,
+      currentThinking: '',
+      currentDelta: '',
+      currentTraces: []
     })
 
-    const llmMessages: LLMMessage[] = [
-      {
-        role: 'system',
-        content: SYSTEM_PROMPT
-      }
-    ]
-
-    if (manuscriptContext?.trim()) {
-      llmMessages.push({
-        role: 'user',
-        content: `【当前手稿参考内容】：\n${manuscriptContext.slice(0, 4000)}\n\n【创作要求或修改意见】：\n${userPrompt.trim()}`
-      })
-    } else {
-      llmMessages.push({
-        role: 'user',
-        content: userPrompt.trim()
-      })
+    const taskOptions: AgentTaskOptions = {
+      userPrompt: prompt.trim(),
+      projectPath: contextParams.projectPath,
+      activeChapterFilename: contextParams.activeChapterFilename,
+      manuscriptContext: contextParams.manuscriptContext
     }
 
-    let accumulatedText = ''
-    let streamHandle: { requestId: string; unsubscribe: () => void } | null = null
+    let accumulatedDelta = ''
+    let accumulatedThinking = ''
+    let tracesList: AgentTraceStep[] = []
 
     try {
-      streamHandle = window.api.generateStream(
-        {
-          messages: llmMessages,
-          temperature: 0.7
-        },
-        (chunk: LLMStreamChunk) => {
-          if (chunk.error) {
-            set({ isStreaming: false, currentRequestId: null })
-            const errorMsg: AgentMessage = {
-              id: `msg-${Date.now()}-err`,
-              role: 'assistant',
-              content: `[请求失败]: ${chunk.error}`,
-              timestamp: Date.now()
-            }
-            set((state) => ({ messages: [...state.messages, errorMsg] }))
-            streamHandle?.unsubscribe()
-            return
+      const handle = window.api.agentRunTask(taskOptions, (event: AgentStreamEvent) => {
+        if (event.type === 'thinking' && event.thinkingDelta) {
+          accumulatedThinking += event.thinkingDelta
+          set({ currentThinking: accumulatedThinking })
+        } else if (event.type === 'delta' && event.delta) {
+          accumulatedDelta += event.delta
+          set({ currentDelta: accumulatedDelta })
+        } else if (event.type === 'tool_start' && event.toolCall) {
+          const newTrace: AgentTraceStep = {
+            id: event.toolCall.id,
+            type: 'tool_call',
+            toolName: event.toolCall.name,
+            args: event.toolCall.args || {},
+            status: 'running',
+            timestamp: Date.now()
+          }
+          tracesList = [...tracesList, newTrace]
+          set({ currentTraces: tracesList })
+        } else if (event.type === 'tool_result' && event.toolResult) {
+          const res = event.toolResult
+          tracesList = tracesList.map((t) =>
+            t.id === res.id
+              ? {
+                  ...t,
+                  status: res.error ? 'error' : 'success',
+                  result: res.result,
+                  error: res.error,
+                  durationMs: res.durationMs
+                }
+              : t
+          )
+          set({ currentTraces: tracesList })
+        } else if (event.type === 'done') {
+          const assistantMsg: AgentMessage = {
+            id: `msg-${Date.now()}-a`,
+            role: 'assistant',
+            content: accumulatedDelta || (tracesList.length > 0 ? '已完成所有自主工具调用调度。' : '完成。'),
+            thinking: accumulatedThinking || undefined,
+            traces: tracesList.length > 0 ? tracesList : undefined,
+            timestamp: Date.now()
           }
 
-          if (chunk.delta) {
-            accumulatedText += chunk.delta
-            set({ currentDelta: accumulatedText })
+          set((state) => ({
+            messages: [...state.messages, assistantMsg],
+            isRunning: false,
+            currentTaskId: null,
+            currentThinking: '',
+            currentDelta: '',
+            currentTraces: []
+          }))
+          handle.unsubscribe()
+        } else if (event.type === 'error') {
+          const errorMsg: AgentMessage = {
+            id: `msg-${Date.now()}-err`,
+            role: 'assistant',
+            content: `[执行异常]: ${event.error || '任务执行失败'}`,
+            traces: tracesList.length > 0 ? tracesList : undefined,
+            timestamp: Date.now()
           }
 
-          if (chunk.done) {
-            set({
-              isStreaming: false,
-              currentRequestId: null,
-              currentDelta: ''
-            })
-
-            const cleanContent = stripMarkdownMarks(accumulatedText)
-            const assistantMsg: AgentMessage = {
-              id: `msg-${Date.now()}-a`,
-              role: 'assistant',
-              content: cleanContent,
-              timestamp: Date.now()
-            }
-
-            set((state) => ({ messages: [...state.messages, assistantMsg] }))
-            streamHandle?.unsubscribe()
-          }
+          set((state) => ({
+            messages: [...state.messages, errorMsg],
+            isRunning: false,
+            currentTaskId: null,
+            currentThinking: '',
+            currentDelta: '',
+            currentTraces: []
+          }))
+          handle.unsubscribe()
         }
-      )
+      })
 
-      set({ currentRequestId: streamHandle.requestId })
+      set({ currentTaskId: handle.taskId })
     } catch (err) {
-      set({ isStreaming: false, currentRequestId: null })
       const errorMsg: AgentMessage = {
         id: `msg-${Date.now()}-err`,
         role: 'assistant',
-        content: `[调用异常]: ${err instanceof Error ? err.message : String(err)}`,
+        content: `[调度异常]: ${err instanceof Error ? err.message : String(err)}`,
         timestamp: Date.now()
       }
-      set((state) => ({ messages: [...state.messages, errorMsg] }))
-      streamHandle?.unsubscribe()
+      set((state) => ({
+        messages: [...state.messages, errorMsg],
+        isRunning: false,
+        currentTaskId: null,
+        currentThinking: '',
+        currentDelta: '',
+        currentTraces: []
+      }))
     }
   },
 
-  abortStreaming: () => {
-    const { currentRequestId, isStreaming } = get()
-    if (isStreaming && currentRequestId) {
-      window.api.abortStream(currentRequestId).catch(() => {})
-      set({ isStreaming: false, currentRequestId: null })
+  abortTask: () => {
+    const { currentTaskId, isRunning } = get()
+    if (isRunning && currentTaskId) {
+      window.api.agentAbortTask(currentTaskId).catch(() => {})
+      set({
+        isRunning: false,
+        currentTaskId: null,
+        currentThinking: '',
+        currentDelta: '',
+        currentTraces: []
+      })
     }
   }
 }))

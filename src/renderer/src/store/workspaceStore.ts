@@ -39,6 +39,8 @@ const DEFAULT_CHAPTER_TEMPLATE = {
   filename: '001-第一章.txt'
 }
 
+let isFileSyncSubscribed = false
+
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   projectPath: null,
   projectTitle: '',
@@ -48,6 +50,30 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   lastSavedAt: null,
 
   initWorkspace: async (lastProjectPath?: string | null) => {
+    // Setup Live File Sync listener once
+    if (!isFileSyncSubscribed && window.api?.onProjectFileChanged) {
+      window.api.onProjectFileChanged((payload) => {
+        const { projectPath, filename, content } = payload
+        const state = get()
+        if (!state.projectPath || state.projectPath !== projectPath) return
+
+        const existing = state.chapters.find((ch) => ch.filename === filename)
+        if (existing) {
+          // Live update chapter content directly on screen!
+          const updated = state.chapters.map((ch) =>
+            ch.filename === filename
+              ? { ...ch, content: content ?? ch.content, updatedAt: Date.now() }
+              : ch
+          )
+          set({ chapters: updated, isDirty: false, lastSavedAt: Date.now() })
+        } else {
+          // New chapter file created on disk, reload project list
+          state.loadProjectByPath(projectPath)
+        }
+      })
+      isFileSyncSubscribed = true
+    }
+
     if (lastProjectPath && typeof lastProjectPath === 'string') {
       try {
         await get().loadProjectByPath(lastProjectPath)

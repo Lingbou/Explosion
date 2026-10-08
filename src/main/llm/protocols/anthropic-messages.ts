@@ -1,4 +1,9 @@
-import { LLMGenerateOptions, LLMGenerateResult, LLMStreamChunk } from '../../../shared/types/llm'
+import {
+  LLMGenerateOptions,
+  LLMGenerateResult,
+  LLMStreamChunk,
+  ToolCall
+} from '../../../shared/types/llm'
 import { parseSSEStream, resolveEndpoint } from '../utils'
 
 export interface AnthropicMessagesClientConfig {
@@ -30,15 +35,49 @@ export class AnthropicMessagesClient {
 
     // Extract system prompt
     const systemParts: string[] = []
-    const chatMessages: Array<{ role: 'user' | 'assistant'; content: string }> = []
+    const chatMessages: Array<{ role: 'user' | 'assistant'; content: any }> = []
 
     for (const msg of options.messages) {
       if (msg.role === 'system') {
-        systemParts.push(msg.content)
+        if (msg.content) systemParts.push(msg.content)
+      } else if (msg.role === 'tool') {
+        chatMessages.push({
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: msg.tool_call_id,
+              content: msg.content || ''
+            }
+          ]
+        })
+      } else if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+        const blocks: any[] = []
+        if (msg.content) {
+          blocks.push({ type: 'text', text: msg.content })
+        }
+        for (const tc of msg.tool_calls) {
+          let input = {}
+          try {
+            input = JSON.parse(tc.arguments)
+          } catch {
+            input = { raw: tc.arguments }
+          }
+          blocks.push({
+            type: 'tool_use',
+            id: tc.id,
+            name: tc.name,
+            input
+          })
+        }
+        chatMessages.push({
+          role: 'assistant',
+          content: blocks
+        })
       } else {
         chatMessages.push({
           role: msg.role,
-          content: msg.content
+          content: msg.content || ''
         })
       }
     }
@@ -58,6 +97,13 @@ export class AnthropicMessagesClient {
     }
     if (typeof options.topP === 'number') {
       payload.top_p = options.topP
+    }
+    if (options.tools && options.tools.length > 0) {
+      payload.tools = options.tools.map((t) => ({
+        name: t.name,
+        description: t.description,
+        input_schema: t.parameters
+      }))
     }
 
     return { payload, model }
@@ -80,10 +126,19 @@ export class AnthropicMessagesClient {
 
     const data = (await res.json()) as any
     let text = ''
+    const toolCalls: ToolCall[] = []
+
     if (Array.isArray(data?.content)) {
       for (const block of data.content) {
         if (block?.type === 'text') {
           text += block.text || ''
+        } else if (block?.type === 'tool_use') {
+          toolCalls.push({
+            id: block.id,
+            type: 'function',
+            name: block.name,
+            arguments: typeof block.input === 'string' ? block.input : JSON.stringify(block.input || {})
+          })
         }
       }
     }
@@ -96,7 +151,8 @@ export class AnthropicMessagesClient {
         completionTokens: data?.usage?.output_tokens,
         totalTokens:
           (data?.usage?.input_tokens || 0) + (data?.usage?.output_tokens || 0) || undefined
-      }
+      },
+      toolCalls: toolCalls.length > 0 ? toolCalls : undefined
     }
   }
 
@@ -129,6 +185,8 @@ export class AnthropicMessagesClient {
     let reportedModel = model
     let inputTokens = 0
     let outputTokens = 0
+    const toolCallsMap = new Map<number, { id: string; name: string; arguments: string }>()
+    let currentBlockIndex = -1
 
     for await (const { event, data } of parseSSEStream(res.body)) {
       try {
@@ -141,14 +199,31 @@ export class AnthropicMessagesClient {
           }
         }
 
-        if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-          const delta = parsed.delta.text
-          fullText += delta
-          onChunk({
-            requestId,
-            delta,
-            done: false
-          })
+        if (parsed.type === 'content_block_start') {
+          currentBlockIndex = parsed.index ?? 0
+          if (parsed.content_block?.type === 'tool_use') {
+            toolCallsMap.set(currentBlockIndex, {
+              id: parsed.content_block.id || `call_${Date.now()}`,
+              name: parsed.content_block.name || '',
+              arguments: ''
+            })
+          }
+        }
+
+        if (parsed.type === 'content_block_delta') {
+          if (parsed.delta?.type === 'text_delta' && parsed.delta.text) {
+            const delta = parsed.delta.text
+            fullText += delta
+            onChunk({
+              requestId,
+              delta,
+              done: false
+            })
+          } else if (parsed.delta?.type === 'input_json_delta' && parsed.delta.partial_json) {
+            const current = toolCallsMap.get(currentBlockIndex) || { id: '', name: '', arguments: '' }
+            current.arguments += parsed.delta.partial_json
+            toolCallsMap.set(currentBlockIndex, current)
+          }
         }
 
         if (parsed.type === 'message_delta' && parsed.usage?.output_tokens) {
@@ -169,17 +244,28 @@ export class AnthropicMessagesClient {
       totalTokens: inputTokens + outputTokens
     }
 
+    const finalToolCalls = toolCallsMap.size > 0
+      ? Array.from(toolCallsMap.values()).map((t) => ({
+          id: t.id,
+          type: 'function' as const,
+          name: t.name,
+          arguments: t.arguments
+        }))
+      : undefined
+
     onChunk({
       requestId,
       delta: '',
       done: true,
-      usage
+      usage,
+      toolCalls: finalToolCalls
     })
 
     return {
       text: fullText,
       model: reportedModel,
-      usage
+      usage,
+      toolCalls: finalToolCalls
     }
   }
 }
