@@ -175,33 +175,39 @@ export class ProjectManager {
       }
     }
 
-    // Read ledger
+        // Read threads (暗线)
+    const threadsFile = path.join(storyDir, 'threads.txt')
+    const legacyLedgerFile = path.join(storyDir, 'ledger.txt')
+    const targetFile = fs.existsSync(threadsFile)
+      ? threadsFile
+      : (fs.existsSync(legacyLedgerFile) ? legacyLedgerFile : threadsFile)
+
     let ledger: StoryBibleFile | null = null
-    if (fs.existsSync(ledgerFile)) {
+    if (fs.existsSync(targetFile)) {
       try {
-        const stat = fs.statSync(ledgerFile)
+        const stat = fs.statSync(targetFile)
         ledger = {
-          id: 'ledger-main',
+          id: 'story-threads',
           type: 'ledger',
-          title: '伏笔账本',
-          filename: 'ledger.txt',
-          relativePath: path.join('story', 'ledger.txt'),
-          content: fs.readFileSync(ledgerFile, 'utf-8'),
+          title: '暗线',
+          filename: path.basename(targetFile),
+          relativePath: path.join('story', path.basename(targetFile)),
+          content: fs.readFileSync(targetFile, 'utf-8'),
           updatedAt: stat.mtimeMs
         }
       } catch {
         // ignore
       }
     } else {
-      const initialLedger = '【本作伏笔账本】\n记录全书关键暗线、未解之谜与回收状态。\n\n[伏笔 #1] 主角的隐秘身世\n- 状态：未解开\n- 触发线索：幼年留下的古老指环\n'
-      fs.writeFileSync(ledgerFile, initialLedger, 'utf-8')
+      // Completely blank initial content (Zero mock template)
+      fs.writeFileSync(threadsFile, '', 'utf-8')
       ledger = {
-        id: 'ledger-main',
+        id: 'story-threads',
         type: 'ledger',
-        title: '伏笔账本',
-        filename: 'ledger.txt',
-        relativePath: path.join('story', 'ledger.txt'),
-        content: initialLedger,
+        title: '暗线',
+        filename: 'threads.txt',
+        relativePath: path.join('story', 'threads.txt'),
+        content: '',
         updatedAt: Date.now()
       }
     }
@@ -466,9 +472,7 @@ export class ProjectManager {
     const filename = `${safeTitle}.txt`
     const filePath = path.join(targetDir, filename)
 
-    const initialContent = type === 'outline'
-      ? `【${safeTitle}】\n本卷核心主线矛盾与剧情推演脉络：\n`
-      : `【人物档案：${safeTitle}】\n- 身份定位：\n- 性格特征与行事逻辑：\n- 核心动机：\n- 人际关系：\n`
+    const initialContent = ''
 
     fs.writeFileSync(filePath, initialContent, 'utf-8')
 

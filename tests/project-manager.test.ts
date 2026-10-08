@@ -48,13 +48,13 @@ describe('ProjectManager', () => {
     expect(fs.existsSync(path.join(tempProjectDir, 'story'))).toBe(true)
     expect(fs.existsSync(path.join(tempProjectDir, 'story', 'outlines'))).toBe(true)
     expect(fs.existsSync(path.join(tempProjectDir, 'story', 'characters'))).toBe(true)
-    expect(fs.existsSync(path.join(tempProjectDir, 'story', 'ledger.txt'))).toBe(true)
+    expect(fs.existsSync(path.join(tempProjectDir, 'story', 'threads.txt'))).toBe(true)
     expect(fs.existsSync(path.join(tempProjectDir, '.explosion'))).toBe(true)
 
     expect(data.chapters.length).toBe(1)
     expect(data.chapters[0].title).toBe('第一章')
     expect(data.storyBible).toBeDefined()
-    expect(data.storyBible?.ledger).toBeDefined()
+    expect(data.storyBible?.ledger).toBeDefined(); expect(data.storyBible?.ledger?.content).toBe('')
     expect(testConfigStore.getConfig().workspace.lastProjectPath).toBe(tempProjectDir)
   })
 
@@ -84,7 +84,7 @@ describe('ProjectManager', () => {
 
     // Create outline
     const outline = manager.createStoryFile(tempProjectDir, 'outline', '第一卷大纲')
-    expect(outline.type).toBe('outline')
+    expect(outline.type).toBe('outline'); expect(outline.content).toBe('')
     expect(fs.existsSync(path.join(tempProjectDir, outline.relativePath))).toBe(true)
 
     // Create character
