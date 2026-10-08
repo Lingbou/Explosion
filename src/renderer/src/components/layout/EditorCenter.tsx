@@ -35,6 +35,14 @@ export const EditorCenter: React.FC = () => {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Auto-resize textarea so it expands with content and NEVER displays internal scrollbars
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${Math.max(650, textareaRef.current.scrollHeight)}px`
+    }
+  }, [content])
+
   // Auto-save debounce effect
   useEffect(() => {
     if (!isDirty) return
@@ -114,7 +122,7 @@ export const EditorCenter: React.FC = () => {
   return (
     <main className="flex-1 flex flex-col bg-[#fbfbfa] relative overflow-hidden">
       {/* Editor Sub-header Bar */}
-      <div className="h-11 border-b border-stone-200/80 px-8 flex items-center justify-between bg-white/70 backdrop-blur-xs select-none">
+      <div className="h-11 border-b border-stone-200/80 px-8 flex items-center justify-between bg-white/70 backdrop-blur-xs select-none shrink-0">
         <div className="flex items-center gap-3 flex-1 mr-4">
           <input
             type="text"
@@ -169,16 +177,19 @@ export const EditorCenter: React.FC = () => {
         </div>
       </div>
 
-      {/* Editor Content Area (Typora / iA Writer Paper Style) */}
-      <div className="flex-1 overflow-y-auto px-8 py-10 sm:px-20 flex justify-center scrollbar-thin">
-        <div className="w-full max-w-2xl flex flex-col">
+      {/* Editor Content Area (Spacious Typography Paper Style, Scrollbar strictly attached to rightmost edge) */}
+      <div
+        onClick={() => textareaRef.current?.focus()}
+        className="flex-1 overflow-y-auto scrollbar-thin px-8 py-10 sm:px-14 lg:px-20 cursor-text flex justify-center"
+      >
+        <div className="w-full max-w-4xl flex flex-col">
           <textarea
             ref={textareaRef}
             value={content}
             onChange={(e) => updateContent(e.target.value)}
             placeholder="在此开始写作...（纯文本无污染，静候文字流淌）"
             spellCheck={false}
-            className="w-full flex-1 bg-transparent resize-none border-none focus:outline-none text-stone-900 placeholder-stone-300 text-base leading-[2.1] font-serif tracking-wide min-h-[550px]"
+            className="w-full bg-transparent resize-none overflow-hidden border-none focus:outline-none text-stone-900 placeholder-stone-300 text-base leading-[2.1] font-serif tracking-wide"
             style={{
               fontFamily:
                 '"Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "SimSun", "Times New Roman", serif'
@@ -188,7 +199,7 @@ export const EditorCenter: React.FC = () => {
       </div>
 
       {/* Bottom Status Bar */}
-      <footer className="h-8 border-t border-stone-200 bg-white/80 px-8 flex items-center justify-between text-[11px] text-stone-500 font-mono select-none">
+      <footer className="h-8 border-t border-stone-200 bg-white/80 px-8 flex items-center justify-between text-[11px] text-stone-500 font-mono select-none shrink-0">
         <div className="flex items-center gap-4">
           <span>
             汉字: <strong className="text-stone-800 font-normal">{stats.chineseChars}</strong>
