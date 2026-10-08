@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import {
+  Settings,
   Send,
   Square,
   Terminal,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react'
 import { useAgentStore, AgentTraceStep } from '../../store/agentStore'
 import { useWorkspaceStore } from '../../store/workspaceStore'
+import { useConfigStore } from '../../store/configStore'
 import { stripMarkdownMarks } from '../../lib/typography'
 
 interface RightPanelProps {
@@ -210,6 +212,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
   } = useAgentStore()
 
   const { projectPath, chapters, activeChapterId } = useWorkspaceStore()
+  const { config, isConfigured, setIsSettingsOpen } = useConfigStore()
 
   const [inputPrompt, setInputPrompt] = useState('')
   const [showThinkingMap, setShowThinkingMap] = useState<Record<string, boolean>>({})
@@ -258,13 +261,13 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
       style={{ width: `${width}px` }}
       className="border-l border-stone-200 bg-white flex flex-col justify-between select-none shrink-0 overflow-hidden relative"
     >
-      {/* Top Header: Clean Session Management */}
-      <div className="h-10 px-3.5 border-b border-stone-200 flex items-center justify-between bg-white shrink-0 relative z-30">
+      {/* Top Header: Column-Integrated Session Management, Model Pill & Global Settings */}
+      <div className="h-11 px-3 border-b border-stone-200 flex items-center justify-between bg-white shrink-0 relative z-30">
         {/* Left: Current Session Title & History Dropdown Trigger */}
         <div ref={dropdownRef} className="relative">
           <button
             onClick={() => setIsSessionDropdownOpen(!isSessionDropdownOpen)}
-            className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-stone-100 transition-colors text-left max-w-[190px]"
+            className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-stone-100 transition-colors text-left max-w-[130px]"
             title="点击切换或查看历史会话"
           >
             <span className="font-semibold text-xs text-stone-800 truncate">
@@ -273,7 +276,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
             <ChevronDown className="w-3.5 h-3.5 text-stone-400 shrink-0" />
           </button>
 
-          {/* Sessions Dropdown Menu (Without duplicate "+ 新建" button) */}
+          {/* Sessions Dropdown Menu */}
           {isSessionDropdownOpen && (
             <div className="absolute top-8 left-0 w-64 bg-white border border-stone-200 rounded-lg shadow-xl py-1.5 z-50 text-xs font-sans animate-in fade-in duration-100">
               <div className="px-3 py-1.5 text-[10px] text-stone-400 font-semibold uppercase tracking-wider border-b border-stone-100">
@@ -306,15 +309,15 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
                           {sess.messages.length}条
                         </span>
                         <button
-    onClick={(e) => {
-      e.stopPropagation()
-      deleteSession(sess.id)
-    }}
-    className="p-1 text-stone-400 hover:text-rose-600 rounded hover:bg-stone-200/60 transition-colors shrink-0"
-    title="删除此会话"
-  >
-    <Trash2 className="w-3 h-3" />
-  </button>
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            deleteSession(sess.id)
+                          }}
+                          className="p-1 text-stone-400 hover:text-rose-600 rounded hover:bg-stone-200/60 transition-colors shrink-0"
+                          title="删除此会话"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
                   )
@@ -324,21 +327,48 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
           )}
         </div>
 
-        {/* Right Header Controls: Single Clean [+ 新建会话] & [清空] */}
+        {/* Right Header Controls: New Session, Active Model Pill, Global Settings, Clear */}
         <div className="flex items-center gap-1">
           <button
-            onClick={() => { createSession(); setIsSessionDropdownOpen(false) }}
-            className="flex items-center gap-1 px-2 py-1 rounded text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-colors text-xs font-medium"
+            onClick={() => {
+              createSession()
+              setIsSessionDropdownOpen(false)
+            }}
+            className="flex items-center gap-0.5 px-1.5 py-1 rounded text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-colors text-xs font-medium shrink-0"
             title="开启全新会话"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>新建会话</span>
+            <span>新建</span>
+          </button>
+
+          {/* Active Model Pill */}
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono border border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100 hover:border-stone-300 transition-all max-w-[110px] shrink-0"
+            title="点击配置主力模型与服务商"
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                isConfigured ? 'bg-emerald-500' : 'bg-amber-500'
+              }`}
+            />
+            <span className="truncate">{isConfigured ? config.provider.activeModel || '未选模型' : '未配置'}</span>
+          </button>
+
+          {/* Global Settings */}
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-1 rounded text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors shrink-0"
+            title="全局设置"
+          >
+            <Settings className="w-3.5 h-3.5" />
           </button>
 
           {messages.length > 0 && (
             <button
               onClick={clearMessages}
-              className="text-[10px] text-stone-400 hover:text-stone-700 transition-colors px-1.5 py-1"
+              className="text-[10px] text-stone-400 hover:text-stone-700 transition-colors px-1 py-0.5 shrink-0 ml-0.5"
+              title="清空当前会话消息"
             >
               清空
             </button>
