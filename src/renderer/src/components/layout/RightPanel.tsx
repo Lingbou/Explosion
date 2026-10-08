@@ -15,11 +15,9 @@ import {
   ChevronRight,
   Loader2,
   CheckCircle2,
-  AlertCircle,
-  Sparkles
+  AlertCircle
 } from 'lucide-react'
 import { useAgentStore, AgentTraceStep } from '../../store/agentStore'
-import { useConfigStore } from '../../store/configStore'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 
 interface RightPanelProps {
@@ -181,8 +179,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
     clearMessages
   } = useAgentStore()
 
-  const { config, isConfigured } = useConfigStore()
-  const { projectPath, chapters, activeChapterId } = useWorkspaceStore()
+  const { projectPath, projectTitle, chapters, activeChapterId } = useWorkspaceStore()
 
   const [inputPrompt, setInputPrompt] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -195,8 +192,8 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, currentDelta, currentThinking, currentTraces])
 
-  const handleSend = (customPrompt?: string) => {
-    const textToSend = (customPrompt || inputPrompt).trim()
+  const handleSend = () => {
+    const textToSend = inputPrompt.trim()
     if (!textToSend || isRunning) return
 
     setInputPrompt('')
@@ -215,54 +212,43 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
     }
   }
 
+  // Header Title: Clean Project Name (or 'Explosion')
+  const panelTitle = projectTitle?.trim() || 'Explosion'
+
   return (
     <aside
       style={{ width: `${width}px` }}
       className="border-l border-stone-200 bg-white flex flex-col justify-between select-none shrink-0 overflow-hidden"
     >
-      {/* Top Header */}
+      {/* Top Header: Clean Project Name on Left, Quiet Clear Button on Right */}
       <div className="h-10 px-4 border-b border-stone-200 flex items-center justify-between bg-white shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-semibold text-xs text-stone-800">自主 Agent</span>
-          </div>
-          <span className="text-[10px] font-mono text-stone-400 truncate max-w-[130px]">
-            {isConfigured ? config.provider.activeModel : '未就绪'}
-          </span>
-        </div>
+        <span className="font-semibold text-xs text-stone-800 truncate" title={panelTitle}>
+          {panelTitle}
+        </span>
 
         {messages.length > 0 && (
           <button
             onClick={clearMessages}
             className="text-[10px] text-stone-400 hover:text-stone-700 transition-colors"
           >
-            清空记录
+            清空
           </button>
         )}
       </div>
 
-      {/* Messages & Autonomous Action Feed */}
+      {/* Messages Feed */}
       <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 scrollbar-thin">
         {messages.length === 0 && !isRunning && (
-          <div className="h-full flex flex-col items-center justify-center text-center p-6 text-stone-400 text-xs leading-relaxed space-y-3">
-            <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-500">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="font-medium text-stone-700 text-sm mb-1">物理级自主写作智能体</div>
-              <p className="text-[11px] text-stone-400 max-w-[260px]">
-                直接赋予 Agent 终端命令执行、手稿物理改写与 AnySearch 实时联网搜索权。无需手动复制采纳，AI 直接帮您写好并保存！
-              </p>
-            </div>
+          <div className="h-full flex items-center justify-center text-center p-6 text-stone-400/80 text-xs select-none">
+            在此输入指令或向助手提问...
           </div>
         )}
 
         {messages.map((msg) => (
           <div key={msg.id} className="space-y-1.5 text-xs">
             <div className="text-[10px] text-stone-400 font-medium flex items-center justify-between">
-              <span>{msg.role === 'user' ? '作者指令' : '智能体执行'}</span>
-              <span className="text-[9px] text-stone-300">
+              <span>{msg.role === 'user' ? '作者指令' : '助手执行'}</span>
+              <span className="text-[9px] text-stone-300 font-mono">
                 {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
@@ -282,7 +268,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
                       }
                       className="w-full px-2.5 py-1.5 flex items-center justify-between text-stone-500 hover:text-stone-800 text-[10px]"
                     >
-                      <span>推理心流 (Reasoning)</span>
+                      <span>思考过程 (Reasoning)</span>
                       {showThinkingMap[msg.id] ? (
                         <ChevronDown className="w-3 h-3" />
                       ) : (
@@ -332,9 +318,9 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
         {/* Live Running State */}
         {isRunning && (
           <div className="space-y-2 text-xs">
-            <div className="text-[10px] text-emerald-600 font-medium flex items-center gap-1.5">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              <span>智能体自主调度执行中...</span>
+            <div className="text-[10px] text-stone-500 font-medium flex items-center gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin text-stone-600" />
+              <span>助手执行中...</span>
             </div>
 
             {/* Live Thinking */}
@@ -367,32 +353,8 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Action Chips & Input Area */}
-      <div className="p-3 border-t border-stone-200 bg-white space-y-2 shrink-0">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[10px] text-stone-600 scrollbar-none">
-          <button
-            onClick={() => handleSend('请直接检查藏书库，使用 organize_library.py 脚本对大部头小说进行物理拆书')}
-            disabled={isRunning}
-            className="px-2 py-1 rounded bg-stone-100 hover:bg-stone-200 transition-colors shrink-0 disabled:opacity-50"
-          >
-            📚 物理拆解藏书
-          </button>
-          <button
-            onClick={() => handleSend('请直接改写当前章节手稿的主角动作细节与环境微氛围，并直接保存到磁盘文件')}
-            disabled={isRunning}
-            className="px-2 py-1 rounded bg-stone-100 hover:bg-stone-200 transition-colors shrink-0 disabled:opacity-50"
-          >
-            ✍️ 直接改写手稿
-          </button>
-          <button
-            onClick={() => handleSend('请通过 AnySearch 搜索当前题材涉及的历史风物考据')}
-            disabled={isRunning}
-            className="px-2 py-1 rounded bg-stone-100 hover:bg-stone-200 transition-colors shrink-0 disabled:opacity-50"
-          >
-            🌐 AnySearch 考据
-          </button>
-        </div>
-
+      {/* Input Area (Clean & Pure, without unnecessary chips) */}
+      <div className="p-3 border-t border-stone-200 bg-white shrink-0">
         <div className="relative flex items-end bg-stone-50 border border-stone-200 rounded-lg p-1.5 focus-within:border-stone-400 focus-within:bg-white transition-all">
           <textarea
             value={inputPrompt}
@@ -403,7 +365,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
                 handleSend()
               }
             }}
-            placeholder="下达自主任务 (如：重写第一章开头、拆解藏书、上网搜索史实)..."
+            placeholder="输入写作指令或问题 (Enter 发送)..."
             rows={2}
             className="w-full bg-transparent resize-none border-none focus:outline-none text-xs text-stone-900 placeholder-stone-400 px-2 py-1 leading-relaxed max-h-24 scrollbar-thin"
           />
@@ -414,17 +376,17 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
                 type="button"
                 onClick={abortTask}
                 className="p-1.5 rounded-md bg-stone-200 text-stone-700 hover:bg-stone-300 transition-colors"
-                title="终止任务"
+                title="终止"
               >
                 <Square className="w-3 h-3 fill-current" />
               </button>
             ) : (
               <button
                 type="button"
-                onClick={() => handleSend()}
+                onClick={handleSend}
                 disabled={!inputPrompt.trim()}
                 className="p-1.5 rounded-md bg-stone-900 text-white hover:bg-stone-800 transition-colors disabled:opacity-30"
-                title="发送任务"
+                title="发送"
               >
                 <Send className="w-3 h-3" />
               </button>
