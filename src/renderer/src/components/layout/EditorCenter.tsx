@@ -225,7 +225,7 @@ export const EditorCenter: React.FC = () => {
           ref={textareaRef}
           value={currentContent}
           onChange={(e) => updateContent(e.target.value)}
-          placeholder="在此开始写作...（纯文本无污染，静候文字流淌）"
+          placeholder="在此开始写作..."
           spellCheck={false}
           className="w-full h-full bg-transparent resize-none overflow-y-auto scrollbar-thin border-none focus:outline-none text-stone-900 placeholder-stone-300 text-base leading-[2.1] font-serif tracking-wide select-text block"
           style={{
