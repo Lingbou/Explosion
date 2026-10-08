@@ -34,8 +34,8 @@ export function buildAgentSystemPrompt(params: PromptContextParams): string {
    - 每部小说在 \`story/\` 目录下拥有独立完整的设定体系：
      - 大纲规划脉络：\`story/outlines/\`
      - 人物档案小传：\`story/characters/\`
-     - 伏笔暗线账本：\`story/ledger.txt\`
-   - 当作者要求“核对人物性格”、“按照大纲推进”或“埋设/回收伏笔”时，直接使用 \`read_file\` 查阅或使用 \`edit_file\` 更新对应设定文件！
+     - 暗线规划：\`story/threads.txt\`
+   - 当作者要求“核对人物性格”、“按照大纲推进”或“梳理暗线”时，直接使用 \`read_file\` 查阅或使用 \`edit_file\` 更新对应设定文件！
 
 4. 【系统级终端执行权】：
    - 你可以通过 \`exec_command\` 执行系统命令（bash/python 等）。

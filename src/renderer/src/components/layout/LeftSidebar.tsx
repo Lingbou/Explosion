@@ -155,7 +155,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
             <div className="flex items-center justify-between px-2 mb-1">
               <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider flex items-center gap-1">
                 <FileText className="w-3.5 h-3.5 text-stone-400" />
-                <span>手稿章节 ({chapters.length})</span>
+                <span>手稿 ({chapters.length})</span>
               </span>
               <button
                 onClick={() => addChapter()}
@@ -420,9 +420,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                 {/* 3. Ledger */}
                 {storyBible?.ledger && (
                   <div className="space-y-0.5">
-                    <div className="px-2 py-1 text-[10px] font-medium text-stone-400">
-                      伏笔账本
-                    </div>
+                    <div className="px-2 py-1 text-[10px] font-medium text-stone-400">暗线</div>
                     <div
                       onClick={() => selectStoryFile(storyBible.ledger!)}
                       className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
@@ -434,7 +432,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                     >
                       <div className="flex items-center gap-1.5 truncate">
                         <Bookmark className="w-3 h-3 text-purple-600 shrink-0" />
-                        <span className="truncate">伏笔暗线账本</span>
+                        <span className="truncate">暗线</span>
                       </div>
                     </div>
                   </div>
