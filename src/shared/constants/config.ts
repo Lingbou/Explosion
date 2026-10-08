@@ -14,7 +14,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   workspace: {
     libraryPath: '~/.explosion/library',
-    autoSaveIntervalMs: 2000
+    autoSaveIntervalMs: 2000,
+    lastProjectPath: null
   },
   ui: {
     theme: 'dark',

@@ -5,20 +5,27 @@ import {
   Copy,
   Clock,
   CheckCircle2,
-  FileEdit
+  FileEdit,
+  FolderOpen,
+  FolderPlus,
+  PenLine
 } from 'lucide-react'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { countTextStats } from '../../lib/typography'
 
 export const EditorCenter: React.FC = () => {
   const {
+    projectPath,
     chapters,
     activeChapterId,
     updateContent,
     updateChapterTitle,
     applyTypography,
     isDirty,
-    saveActiveChapter
+    saveActiveChapter,
+    openProject,
+    createProject,
+    addChapter
   } = useWorkspaceStore()
 
   const [copied, setCopied] = React.useState(false)
@@ -46,14 +53,64 @@ export const EditorCenter: React.FC = () => {
     }
   }
 
-  if (!activeChapter) {
+  // State 1: No project opened (True Empty Project Slate)
+  if (!projectPath) {
     return (
-      <main className="flex-1 flex items-center justify-center bg-[#fbfbfa] text-stone-400 text-sm font-sans">
-        请选择或创建手稿章节
+      <main className="flex-1 flex flex-col items-center justify-center bg-[#fbfbfa] p-8 select-none text-center animate-in fade-in duration-200">
+        <div className="max-w-md w-full flex flex-col items-center space-y-6">
+          <div className="w-12 h-12 rounded-2xl bg-white border border-stone-200 shadow-sm flex items-center justify-center">
+            <PenLine className="w-6 h-6 text-stone-700 stroke-[1.75]" />
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-xl font-semibold tracking-tight text-stone-900">
+              Explosion 创作工作台
+            </h1>
+            <p className="text-xs text-stone-500 leading-relaxed max-w-sm">
+              尚未打开小说工程，请新建或选择本地文件夹作为工程目录，直接读写本地手稿。
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              onClick={createProject}
+              className="px-4 py-2 rounded-lg bg-stone-900 hover:bg-stone-800 text-white text-xs font-medium transition-all shadow-xs flex items-center gap-2"
+            >
+              <FolderPlus className="w-4 h-4" />
+              <span>新建小说工程</span>
+            </button>
+
+            <button
+              onClick={openProject}
+              className="px-4 py-2 rounded-lg bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 hover:text-stone-900 text-xs font-medium transition-all shadow-2xs flex items-center gap-2"
+            >
+              <FolderOpen className="w-4 h-4 text-stone-500" />
+              <span>打开已有工程</span>
+            </button>
+          </div>
+        </div>
       </main>
     )
   }
 
+  // State 2: Project opened, but no chapters exist yet
+  if (chapters.length === 0 || !activeChapter) {
+    return (
+      <main className="flex-1 flex flex-col items-center justify-center bg-[#fbfbfa] p-8 text-center text-stone-500 text-xs">
+        <div className="space-y-3">
+          <div>当前小说工程暂无手稿章节</div>
+          <button
+            onClick={() => addChapter()}
+            className="px-3.5 py-1.5 rounded-lg bg-stone-900 text-white text-xs font-medium hover:bg-stone-800 transition-colors"
+          >
+            + 新建第一章
+          </button>
+        </div>
+      </main>
+    )
+  }
+
+  // State 3: Active chapter editor
   return (
     <main className="flex-1 flex flex-col bg-[#fbfbfa] relative overflow-hidden">
       {/* Editor Sub-header Bar */}

@@ -2,11 +2,17 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { BrowserWindow, dialog, shell } from 'electron'
 import { LibraryBook, LibraryBookContent } from '../../shared/types/ipc'
-import { globalConfigStore } from '../config/store'
+import { ConfigStore, globalConfigStore } from '../config/store'
 
 export class LibraryManager {
+  private configStore: ConfigStore
+
+  constructor(configStore?: ConfigStore) {
+    this.configStore = configStore || globalConfigStore
+  }
+
   private getLibraryPath(): string {
-    const config = globalConfigStore.getConfig()
+    const config = this.configStore.getConfig()
     const libPath = config.workspace.libraryPath
     if (!fs.existsSync(libPath)) {
       fs.mkdirSync(libPath, { recursive: true })

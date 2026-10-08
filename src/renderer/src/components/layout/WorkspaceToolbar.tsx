@@ -6,7 +6,8 @@ import {
   AlignLeft,
   Copy,
   Check,
-  ChevronDown
+  ChevronDown,
+  X
 } from 'lucide-react'
 import { useConfigStore } from '../../store/configStore'
 import { useWorkspaceStore } from '../../store/workspaceStore'
@@ -19,6 +20,7 @@ export const WorkspaceToolbar: React.FC = () => {
     projectPath,
     openProject,
     createProject,
+    closeProject,
     applyTypography,
     chapters,
     activeChapterId
@@ -48,10 +50,12 @@ export const WorkspaceToolbar: React.FC = () => {
           <button
             onClick={() => setIsProjectMenuOpen(!isProjectMenuOpen)}
             className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium text-stone-800 hover:bg-stone-100 transition-colors"
-            title="小说项目菜单"
+            title="小说工程菜单"
           >
-            <FolderOpen className="w-3.5 h-3.5 text-stone-600" />
-            <span className="truncate max-w-[160px] font-semibold">{projectTitle}</span>
+            <FolderOpen className="w-3.5 h-3.5 text-stone-500" />
+            <span className="truncate max-w-[160px] font-semibold text-stone-900">
+              {projectPath ? projectTitle || '未命名作品' : '未打开工程'}
+            </span>
             <ChevronDown className="w-3 h-3 text-stone-400" />
           </button>
 
@@ -61,19 +65,8 @@ export const WorkspaceToolbar: React.FC = () => {
               onMouseLeave={() => setIsProjectMenuOpen(false)}
             >
               <div className="px-3 py-1.5 border-b border-stone-100 text-[10px] text-stone-400">
-                当前路径: {projectPath || '未关联本地文件夹'}
+                {projectPath ? `路径: ${projectPath}` : '尚未关联本地小说文件夹'}
               </div>
-
-              <button
-                onClick={() => {
-                  setIsProjectMenuOpen(false)
-                  openProject()
-                }}
-                className="w-full text-left px-3 py-1.5 hover:bg-stone-50 flex items-center gap-2 text-stone-700 hover:text-stone-900 transition-colors"
-              >
-                <FolderOpen className="w-3.5 h-3.5 text-stone-500" />
-                <span>打开已有小说文件夹...</span>
-              </button>
 
               <button
                 onClick={() => {
@@ -89,18 +82,43 @@ export const WorkspaceToolbar: React.FC = () => {
               <button
                 onClick={() => {
                   setIsProjectMenuOpen(false)
-                  setIsEditingTitle(true)
+                  openProject()
                 }}
-                className="w-full text-left px-3 py-1.5 hover:bg-stone-50 text-stone-600 hover:text-stone-900 transition-colors border-t border-stone-100"
+                className="w-full text-left px-3 py-1.5 hover:bg-stone-50 flex items-center gap-2 text-stone-700 hover:text-stone-900 transition-colors"
               >
-                重命名小说名称
+                <FolderOpen className="w-3.5 h-3.5 text-stone-500" />
+                <span>打开已有小说文件夹...</span>
               </button>
+
+              {projectPath && (
+                <>
+                  <button
+                    onClick={() => {
+                      setIsProjectMenuOpen(false)
+                      setIsEditingTitle(true)
+                    }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-stone-50 text-stone-600 hover:text-stone-900 transition-colors border-t border-stone-100"
+                  >
+                    重命名小说名称
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsProjectMenuOpen(false)
+                      closeProject()
+                    }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-rose-50 text-rose-600 hover:text-rose-700 transition-colors border-t border-stone-100 flex items-center gap-2"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>关闭当前工程</span>
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
 
         {/* Inline Title Editor */}
-        {isEditingTitle && (
+        {isEditingTitle && projectPath && (
           <input
             type="text"
             value={projectTitle}
@@ -139,7 +157,8 @@ export const WorkspaceToolbar: React.FC = () => {
       <div className="flex items-center gap-1">
         <button
           onClick={applyTypography}
-          className="flex items-center gap-1 px-2.5 py-1 text-xs text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-md transition-colors"
+          disabled={!projectPath || !activeChapter}
+          className="flex items-center gap-1 px-2.5 py-1 text-xs text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-md transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
           title="应用中文出版排版规范（全角双空格缩进、标点统一）"
         >
           <AlignLeft className="w-3.5 h-3.5" />
@@ -148,7 +167,8 @@ export const WorkspaceToolbar: React.FC = () => {
 
         <button
           onClick={handleCopyCleanText}
-          className={`flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-all ${
+          disabled={!projectPath || !activeChapter}
+          className={`flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-all disabled:opacity-40 disabled:hover:bg-transparent ${
             copied
               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
               : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'

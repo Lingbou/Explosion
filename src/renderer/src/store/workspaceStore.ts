@@ -17,10 +17,11 @@ interface WorkspaceState {
   activeChapterId: string
   isDirty: boolean
   lastSavedAt: number | null
-  initWorkspace: (lastProjectPath?: string) => Promise<void>
+  initWorkspace: (lastProjectPath?: string | null) => Promise<void>
   openProject: () => Promise<void>
   createProject: () => Promise<void>
   loadProjectByPath: (path: string) => Promise<void>
+  closeProject: () => Promise<void>
   setProjectTitle: (title: string) => void
   selectChapter: (id: string) => void
   updateContent: (content: string) => void
@@ -32,29 +33,27 @@ interface WorkspaceState {
   insertText: (text: string) => void
 }
 
-const DEFAULT_CHAPTER: Chapter = {
-  id: 'ch-1',
+const DEFAULT_CHAPTER_TEMPLATE = {
   title: '第一章',
   content: '',
-  filename: '001-第一章.txt',
-  updatedAt: Date.now()
+  filename: '001-第一章.txt'
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   projectPath: null,
-  projectTitle: '未命名作品',
-  chapters: [DEFAULT_CHAPTER],
-  activeChapterId: 'ch-1',
+  projectTitle: '',
+  chapters: [],
+  activeChapterId: '',
   isDirty: false,
-  lastSavedAt: Date.now(),
+  lastSavedAt: null,
 
-  initWorkspace: async (lastProjectPath?: string) => {
-    if (lastProjectPath) {
+  initWorkspace: async (lastProjectPath?: string | null) => {
+    if (lastProjectPath && typeof lastProjectPath === 'string') {
       try {
         await get().loadProjectByPath(lastProjectPath)
         return
       } catch {
-        // Fallback to default
+        // Fallback to empty slate
       }
     }
   },
@@ -97,6 +96,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } catch {
       // ignore
     }
+  },
+
+  closeProject: async () => {
+    try {
+      await window.api.closeProject()
+    } catch {
+      // ignore
+    }
+    set({
+      projectPath: null,
+      projectTitle: '',
+      chapters: [],
+      activeChapterId: '',
+      isDirty: false,
+      lastSavedAt: null
+    })
   },
 
   setProjectTitle: (title: string) => {
@@ -150,6 +165,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   addChapter: async (customTitle?: string) => {
     const { chapters, projectPath } = get()
+    if (!projectPath) {
+      // Prompt user to create or open a project first
+      await get().createProject()
+      return
+    }
+
     const existingTitles = chapters.map((c) => c.title)
     const title = customTitle || getNextChapterTitle(existingTitles)
     const index = chapters.length + 1
@@ -165,15 +186,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       updatedAt: Date.now()
     }
 
-    if (projectPath) {
-      try {
-        await window.api.saveProjectChapter({
-          projectPath,
-          chapter: newChapter
-        })
-      } catch {
-        // ignore
-      }
+    try {
+      await window.api.saveProjectChapter({
+        projectPath,
+        chapter: newChapter
+      })
+    } catch {
+      // ignore
     }
 
     set({
@@ -204,15 +223,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     // If all chapters were deleted, reset safely to a fresh blank "第一章"
     if (remaining.length === 0) {
       const resetChapter: Chapter = {
-        ...DEFAULT_CHAPTER,
         id: `ch-${Date.now()}`,
+        title: DEFAULT_CHAPTER_TEMPLATE.title,
+        content: '',
+        filename: DEFAULT_CHAPTER_TEMPLATE.filename,
         updatedAt: Date.now()
       }
       if (projectPath) {
-        window.api.saveProjectChapter({
-          projectPath,
-          chapter: resetChapter
-        }).catch(() => {})
+        window.api
+          .saveProjectChapter({
+            projectPath,
+            chapter: resetChapter
+          })
+          .catch(() => {})
       }
       set({
         chapters: [resetChapter],
