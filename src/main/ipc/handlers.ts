@@ -1,5 +1,5 @@
 import { ipcMain, clipboard, BrowserWindow } from 'electron'
-import { IPC_CHANNELS, ProjectChapterFile } from '../../shared/types/ipc'
+import { AgentTaskOptions, IPC_CHANNELS, ProjectChapterFile } from '../../shared/types/ipc'
 import { AppConfig } from '../../shared/types/config'
 import {
   FetchModelsParams,
@@ -10,6 +10,7 @@ import { globalConfigStore } from '../config/store'
 import { globalLLMAdapter } from '../llm/adapter'
 import { globalProjectManager } from '../project/manager'
 import { globalLibraryManager } from '../library/manager'
+import { globalAgentRunner } from '../agent/runner'
 
 export function registerIpcHandlers(): void {
   // Config Handlers
@@ -69,6 +70,38 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.LLM_ABORT_STREAM, async (_event, requestId: string) => {
     return globalLLMAdapter.abortStream(requestId)
+  })
+
+  // Autonomous Agent Handlers
+  ipcMain.handle(
+    IPC_CHANNELS.AGENT_RUN_TASK,
+    async (
+      event,
+      { options, taskId }: { options: AgentTaskOptions; taskId: string }
+    ) => {
+      try {
+        await globalAgentRunner.runTask(taskId, options, (streamEvent) => {
+          if (!event.sender.isDestroyed()) {
+            event.sender.send(`agent:event:${taskId}`, streamEvent)
+          }
+        })
+        return { success: true }
+      } catch (err) {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send(`agent:event:${taskId}`, {
+            taskId,
+            type: 'error',
+            error: err instanceof Error ? err.message : '智能体任务执行异常',
+            done: true
+          })
+        }
+        throw err
+      }
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.AGENT_ABORT_TASK, async (_event, taskId: string) => {
+    return globalAgentRunner.abortTask(taskId)
   })
 
   // Project Management Handlers

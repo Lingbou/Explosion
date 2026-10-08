@@ -37,6 +37,45 @@ export interface LibraryBookContent {
   size: number
 }
 
+export interface AgentTaskOptions {
+  userPrompt: string
+  projectPath?: string | null
+  activeChapterFilename?: string | null
+  manuscriptContext?: string
+}
+
+export interface AgentToolCallInfo {
+  id: string
+  name: string
+  args: Record<string, unknown>
+}
+
+export interface AgentToolResultInfo {
+  id: string
+  name: string
+  result: string
+  error?: string
+  durationMs: number
+}
+
+export interface AgentStreamEvent {
+  taskId: string
+  type: 'thinking' | 'delta' | 'tool_start' | 'tool_result' | 'done' | 'error'
+  delta?: string
+  thinkingDelta?: string
+  toolCall?: AgentToolCallInfo
+  toolResult?: AgentToolResultInfo
+  error?: string
+  done?: boolean
+}
+
+export interface ProjectFileChangedPayload {
+  projectPath: string
+  filePath: string
+  filename: string
+  content?: string
+}
+
 export const IPC_CHANNELS = {
   // Config
   CONFIG_GET: 'config:get',
@@ -50,7 +89,11 @@ export const IPC_CHANNELS = {
   LLM_GENERATE_STREAM: 'llm:generate-stream',
   LLM_ABORT_STREAM: 'llm:abort-stream',
 
-  // Project Management
+  // Agent Autonomous Runner
+  AGENT_RUN_TASK: 'agent:run-task',
+  AGENT_ABORT_TASK: 'agent:abort-task',
+
+  // Project Management & Live File Sync
   PROJECT_OPEN_DIALOG: 'project:open-dialog',
   PROJECT_CREATE_DIALOG: 'project:create-dialog',
   PROJECT_LOAD: 'project:load',
@@ -59,6 +102,7 @@ export const IPC_CHANNELS = {
   PROJECT_DELETE_CHAPTER: 'project:delete-chapter',
   PROJECT_SAVE_META: 'project:save-meta',
   PROJECT_CLOSE: 'project:close',
+  PROJECT_FILE_CHANGED: 'project:file-changed',
 
   // Material Library
   LIBRARY_LIST: 'library:list',
@@ -85,12 +129,19 @@ export interface ElectronApi {
   fetchModels: (params: FetchModelsParams) => Promise<FetchModelsResult>
   generate: (params: LLMGenerateOptions) => Promise<LLMGenerateResult>
   generateStream: (
-    params: LLMGenerateOptions,
+    options: LLMGenerateOptions,
     onChunk: (chunk: LLMStreamChunk) => void
   ) => { requestId: string; unsubscribe: () => void }
   abortStream: (requestId: string) => Promise<boolean>
 
-  // Project Management
+  // Agent Autonomous Runner
+  agentRunTask: (
+    options: AgentTaskOptions,
+    onEvent: (event: AgentStreamEvent) => void
+  ) => { taskId: string; unsubscribe: () => void }
+  agentAbortTask: (taskId: string) => Promise<boolean>
+
+  // Project Management & Live File Sync
   openProjectDialog: () => Promise<string | null>
   createProjectDialog: () => Promise<string | null>
   loadProject: (projectPath: string) => Promise<ProjectData>
@@ -110,6 +161,9 @@ export interface ElectronApi {
   }) => Promise<boolean>
   saveProjectMeta: (params: { projectPath: string; title: string }) => Promise<boolean>
   closeProject: () => Promise<boolean>
+  onProjectFileChanged: (
+    callback: (payload: ProjectFileChangedPayload) => void
+  ) => () => void
 
   // Library
   listLibraryFiles: () => Promise<LibraryBook[]>

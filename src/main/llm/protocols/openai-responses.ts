@@ -1,4 +1,9 @@
-import { LLMGenerateOptions, LLMGenerateResult, LLMStreamChunk } from '../../../shared/types/llm'
+import {
+  LLMGenerateOptions,
+  LLMGenerateResult,
+  LLMStreamChunk,
+  ToolCall
+} from '../../../shared/types/llm'
 import { parseSSEStream, resolveEndpoint } from '../utils'
 
 export interface OpenAIResponsesClientConfig {
@@ -24,20 +29,41 @@ export class OpenAIResponsesClient {
     return headers
   }
 
+  private formatInput(messages: LLMGenerateOptions['messages']): Array<Record<string, unknown>> {
+    return messages.map((m) => {
+      const item: Record<string, unknown> = {
+        role: m.role,
+        content: m.content
+      }
+      if (m.tool_calls && m.tool_calls.length > 0) {
+        item.tool_calls = m.tool_calls
+      }
+      if (m.tool_call_id) {
+        item.tool_call_id = m.tool_call_id
+      }
+      return item
+    })
+  }
+
   public async generate(options: LLMGenerateOptions): Promise<LLMGenerateResult> {
     const url = this.getUrl()
     const model = options.model || this.config.defaultModel
 
     const body: Record<string, unknown> = {
       model,
-      input: options.messages.map((m) => ({
-        role: m.role,
-        content: m.content
-      })),
+      input: this.formatInput(options.messages),
       stream: false
     }
     if (typeof options.temperature === 'number') {
       body.temperature = options.temperature
+    }
+    if (options.tools && options.tools.length > 0) {
+      body.tools = options.tools.map((t) => ({
+        type: 'function',
+        name: t.name,
+        description: t.description,
+        parameters: t.parameters
+      }))
     }
 
     const res = await fetch(url, {
@@ -53,6 +79,7 @@ export class OpenAIResponsesClient {
 
     const data = (await res.json()) as any
     let text = ''
+    const toolCalls: ToolCall[] = []
 
     if (typeof data?.output_text === 'string') {
       text = data.output_text
@@ -60,6 +87,13 @@ export class OpenAIResponsesClient {
       for (const item of data.output) {
         if (typeof item === 'string') {
           text += item
+        } else if (item?.type === 'function_call') {
+          toolCalls.push({
+            id: item.call_id || item.id || `call_${Date.now()}`,
+            type: 'function',
+            name: item.name || '',
+            arguments: typeof item.arguments === 'string' ? item.arguments : JSON.stringify(item.arguments || {})
+          })
         } else if (item?.content) {
           if (typeof item.content === 'string') {
             text += item.content
@@ -80,7 +114,8 @@ export class OpenAIResponsesClient {
         promptTokens: data?.usage?.input_tokens ?? data?.usage?.prompt_tokens,
         completionTokens: data?.usage?.output_tokens ?? data?.usage?.completion_tokens,
         totalTokens: data?.usage?.total_tokens
-      }
+      },
+      toolCalls: toolCalls.length > 0 ? toolCalls : undefined
     }
   }
 
@@ -95,14 +130,19 @@ export class OpenAIResponsesClient {
 
     const body: Record<string, unknown> = {
       model,
-      input: options.messages.map((m) => ({
-        role: m.role,
-        content: m.content
-      })),
+      input: this.formatInput(options.messages),
       stream: true
     }
     if (typeof options.temperature === 'number') {
       body.temperature = options.temperature
+    }
+    if (options.tools && options.tools.length > 0) {
+      body.tools = options.tools.map((t) => ({
+        type: 'function',
+        name: t.name,
+        description: t.description,
+        parameters: t.parameters
+      }))
     }
 
     const res = await fetch(url, {
@@ -123,7 +163,8 @@ export class OpenAIResponsesClient {
 
     let fullText = ''
     let reportedModel = model
-    let usage
+    let usage: LLMGenerateResult['usage']
+    const toolCallsMap = new Map<string, { id: string; name: string; arguments: string }>()
 
     for await (const { data } of parseSSEStream(res.body)) {
       if (data === '[DONE]') {
@@ -146,6 +187,23 @@ export class OpenAIResponsesClient {
           delta = parsed.delta
         } else if (parsed.type === 'response.output_item.delta' && parsed.delta?.text) {
           delta = parsed.delta.text
+        } else if (parsed.type === 'response.output_item.added' && parsed.item?.type === 'function_call') {
+          const item = parsed.item
+          const id = item.call_id || item.id || `call_${Date.now()}`
+          toolCallsMap.set(id, { id, name: item.name || '', arguments: item.arguments || '' })
+        } else if (parsed.type === 'response.function_call_arguments.delta') {
+          const id = parsed.call_id || parsed.item_id || ''
+          const current = toolCallsMap.get(id) || { id, name: '', arguments: '' }
+          current.arguments += parsed.delta || ''
+          toolCallsMap.set(id, current)
+        } else if (parsed.type === 'response.output_item.done' && parsed.item?.type === 'function_call') {
+          const item = parsed.item
+          const id = item.call_id || item.id || `call_${Date.now()}`
+          toolCallsMap.set(id, {
+            id,
+            name: item.name || '',
+            arguments: typeof item.arguments === 'string' ? item.arguments : JSON.stringify(item.arguments || {})
+          })
         } else if (parsed.delta?.content) {
           delta = parsed.delta.content
         } else if (typeof parsed.delta === 'string') {
@@ -166,17 +224,28 @@ export class OpenAIResponsesClient {
       }
     }
 
+    const finalToolCalls = toolCallsMap.size > 0
+      ? Array.from(toolCallsMap.values()).map((t) => ({
+          id: t.id,
+          type: 'function' as const,
+          name: t.name,
+          arguments: t.arguments
+        }))
+      : undefined
+
     onChunk({
       requestId,
       delta: '',
       done: true,
-      usage
+      usage,
+      toolCalls: finalToolCalls
     })
 
     return {
       text: fullText,
       model: reportedModel,
-      usage
+      usage,
+      toolCalls: finalToolCalls
     }
   }
 }

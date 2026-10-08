@@ -5,7 +5,10 @@ import {
   ProjectData,
   ProjectChapterFile,
   LibraryBook,
-  LibraryBookContent
+  LibraryBookContent,
+  AgentTaskOptions,
+  AgentStreamEvent,
+  ProjectFileChangedPayload
 } from '../shared/types/ipc'
 import { AppConfig, AppPaths } from '../shared/types/config'
 import {
@@ -70,7 +73,41 @@ const api: ElectronApi = {
   abortStream: (requestId: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.LLM_ABORT_STREAM, requestId),
 
-  // Project Management
+  // Agent Autonomous Runner
+  agentRunTask: (
+    options: AgentTaskOptions,
+    onEvent: (event: AgentStreamEvent) => void
+  ): { taskId: string; unsubscribe: () => void } => {
+    const taskId = crypto.randomUUID()
+    const channel = `agent:event:${taskId}`
+
+    const listener = (_event: IpcRendererEvent, eventData: AgentStreamEvent): void => {
+      onEvent(eventData)
+    }
+
+    ipcRenderer.on(channel, listener)
+
+    ipcRenderer.invoke(IPC_CHANNELS.AGENT_RUN_TASK, { options, taskId }).catch((err) => {
+      onEvent({
+        taskId,
+        type: 'error',
+        error: err instanceof Error ? err.message : String(err),
+        done: true
+      })
+    })
+
+    return {
+      taskId,
+      unsubscribe: () => {
+        ipcRenderer.removeListener(channel, listener)
+      }
+    }
+  },
+
+  agentAbortTask: (taskId: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AGENT_ABORT_TASK, taskId),
+
+  // Project Management & Live File Sync
   openProjectDialog: (): Promise<string | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.PROJECT_OPEN_DIALOG),
 
@@ -102,6 +139,23 @@ const api: ElectronApi = {
     ipcRenderer.invoke(IPC_CHANNELS.PROJECT_SAVE_META, params),
 
   closeProject: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_CLOSE),
+
+  onProjectFileChanged: (
+    callback: (payload: ProjectFileChangedPayload) => void
+  ): (() => void) => {
+    const listener = (
+      _event: IpcRendererEvent,
+      payload: ProjectFileChangedPayload
+    ): void => {
+      callback(payload)
+    }
+
+    ipcRenderer.on(IPC_CHANNELS.PROJECT_FILE_CHANGED, listener)
+
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.PROJECT_FILE_CHANGED, listener)
+    }
+  },
 
   // Library
   listLibraryFiles: (): Promise<LibraryBook[]> =>
