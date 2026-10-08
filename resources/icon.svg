@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1c1917" />
+      <stop offset="100%" stop-color="#0c0a09" />
+    </linearGradient>
+
+    <!-- Explosion Flame Gradient -->
+    <linearGradient id="fireGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="30%" stop-color="#f59e0b" />
+      <stop offset="70%" stop-color="#ea580c" />
+      <stop offset="100%" stop-color="#dc2626" />
+    </linearGradient>
+
+    <!-- Secondary Ember Glow -->
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ea580c" stop-opacity="0.35" />
+      <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#1c1917" stop-opacity="0" />
+    </radialGradient>
+
+    <linearGradient id="goldRing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" stop-opacity="0.8" />
+      <stop offset="50%" stop-color="#f59e0b" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#b45309" stop-opacity="0.7" />
+    </linearGradient>
+  </defs>
+
+  <!-- App Squircle Base -->
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#bgGrad)" stroke="#292524" stroke-width="4" />
+
+  <!-- Ambient Magic Aura -->
+  <circle cx="256" cy="256" r="190" fill="url(#glowGrad)" />
+
+  <!-- Outer Celestial Orbit Ring -->
+  <circle cx="256" cy="256" r="145" fill="none" stroke="url(#goldRing)" stroke-width="2.5" stroke-dasharray="8 6" />
+
+  <!-- Secondary Diagonal Star Burst (Subtle) -->
+  <path d="M 256 160 Q 256 256 160 256 Q 256 256 256 352 Q 256 256 352 256 Q 256 256 256 160 Z"
+        fill="#f97316" opacity="0.35" transform="rotate(45 256 256)" />
+
+  <!-- Primary Explosion Starburst (Megumin Explosion Spark) -->
+  <!-- Top: (256, 76), Bottom: (256, 436), Left: (76, 256), Right: (436, 256) -->
+  <path d="M 256 76 
+           Q 256 256 76 256 
+           Q 256 256 256 436 
+           Q 256 256 436 256 
+           Q 256 256 256 76 Z" 
+        fill="url(#fireGrad)" 
+        filter="drop-shadow(0 0 16px rgba(234, 88, 12, 0.55))" />
+
+  <!-- Inner Diamond Spark Core -->
+  <path d="M 256 156 
+           Q 256 256 156 256 
+           Q 256 256 256 356 
+           Q 256 256 356 256 
+           Q 256 256 256 156 Z" 
+        fill="#fffbeb" />
+
+  <!-- Stylized Pen Nib / Feather Split in the Core (Literature Symbol) -->
+  <line x1="256" y1="200" x2="256" y2="312" stroke="#b45309" stroke-width="3.5" stroke-linecap="round" />
+  <circle cx="256" cy="256" r="5" fill="#78350f" />
+
+  <!-- Four Tiny Spark Jewels at the Quadrants -->
+  <circle cx="256" cy="116" r="4.5" fill="#fef08a" />
+  <circle cx="256" cy="396" r="4.5" fill="#fef08a" />
+  <circle cx="116" cy="256" r="4.5" fill="#fef08a" />
+  <circle cx="396" cy="256" r="4.5" fill="#fef08a" />
+</svg>
