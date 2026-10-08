@@ -1,32 +1,37 @@
 /**
  * Typography utilities strictly enforcing:
- * 1. Zero Markdown pollution (strips '#', '**', '*', '>', bullet markers, etc.)
+ * 1. Zero Markdown pollution (strips '#', '**', '*', '`', '>', bullet markers, etc.)
  * 2. Standard Chinese publication paragraph indentation (two full-width spaces \u3000\u3000)
  * 3. Chinese punctuation standardization (quotes, dashes, ellipses)
  */
 
 export function stripMarkdownMarks(text: string): string {
+  if (!text) return ''
+
   let cleaned = text
+    // Remove fenced code blocks (```...```)
+    .replace(/```[\s\S]*?```/g, '')
+    // Remove inline backticks
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/`/g, '')
+    // Remove bold/italics combinations (***...***, **...**, *...*)
+    .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/\*\*/g, '')
+    .replace(/\*/g, '')
+    // Remove underscores (__...__, _..._)
+    .replace(/___([^_]+)___/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
     // Remove headers (# Header)
     .replace(/^#{1,6}\s+/gm, '')
-    // Remove bold/italics (***text***, **text**, *text*)
-    .replace(/\*\*\*(.*?)\*\*\*/g, '$1')
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/___(.*?)___/g, '$1')
-    .replace(/__(.*?)__/g, '$1')
-    .replace(/_(.*?)_/g, '$1')
     // Remove markdown links [text](url) -> text
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     // Remove blockquotes (> text)
     .replace(/^>\s*/gm, '')
     // Remove bullet points (- item, * item, + item)
     .replace(/^[-*+]\s+/gm, '')
-    // Remove numbered lists (1. item)
-    .replace(/^\d+\.\s+/gm, '')
-    // Remove code blocks (```...```)
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/`([^`]+)`/g, '$1')
 
   return cleaned
 }

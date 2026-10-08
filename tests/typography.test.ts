@@ -5,19 +5,28 @@ import {
   formatChineseManuscript,
   countTextStats
 } from '../src/renderer/src/lib/typography'
+import { generateSessionTitle } from '../src/shared/utils/session'
 
 describe('Typography & Chinese Formatting', () => {
-  it('should strip markdown headers, bold, italics, quotes and lists', () => {
-    const raw = `# 第一章 暴风雨\n\n> 这是一个引用\n\n**加粗内容** 与 *斜体内容*\n\n- 列表项1\n- 列表项2\n\n正文正常句子。`
+  it('should strip markdown headers, bold, italics, quotes, backticks and lists', () => {
+    const raw = `# 第一章 暴风雨\n\n> 这是一个引用\n\n**加粗内容** 与 *斜体内容*\n\n1. **\`web_search\`**: 搜索关键词\n- 列表项1\n- 列表项2\n\n正文正常句子。`
     const cleaned = stripMarkdownMarks(raw)
 
     expect(cleaned).not.toContain('#')
     expect(cleaned).not.toContain('**')
     expect(cleaned).not.toContain('*')
+    expect(cleaned).not.toContain('`')
     expect(cleaned).not.toContain('>')
     expect(cleaned).not.toContain('- 列表项')
     expect(cleaned).toContain('加粗内容 与 斜体内容')
+    expect(cleaned).toContain('1. web_search: 搜索关键词')
     expect(cleaned).toContain('正文正常句子。')
+  })
+
+  it('should thoroughly clean bold words embedded in sentences', () => {
+    const raw = '我**完全具备实时联网搜索能力**，通过**AnySearch**进行搜索'
+    const cleaned = stripMarkdownMarks(raw)
+    expect(cleaned).toBe('我完全具备实时联网搜索能力，通过AnySearch进行搜索')
   })
 
   it('should standardize Chinese punctuation', () => {
@@ -42,7 +51,16 @@ describe('Typography & Chinese Formatting', () => {
     const sample = '南淮的夏天。 Hello world!'
     const stats = countTextStats(sample)
 
-    expect(stats.chineseChars).toBe(5) // 南淮的夏天 (5 han ideographs)
-    expect(stats.words).toBe(7) // 5 Chinese + 2 English words
+    expect(stats.chineseChars).toBe(5)
+    expect(stats.words).toBe(7)
+  })
+
+  it('should generate concise session titles from first user prompt', () => {
+    const title1 = generateSessionTitle('请帮我润色第一章主角吕归尘出场的动作细节与环境微氛围')
+    expect(title1.length).toBeLessThanOrEqual(14)
+    expect(title1).toContain('请帮我润色第一章主角')
+
+    const title2 = generateSessionTitle('   ')
+    expect(title2).toBe('新会话')
   })
 })

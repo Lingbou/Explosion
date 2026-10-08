@@ -7,6 +7,9 @@ interface LibraryState {
   isLibraryModalOpen: boolean
   selectedBookFilename: string | null
   previewBook: LibraryBookContent | null
+  processingFilenames: string[]
+
+  initLibraryListeners: () => void
   fetchBooks: () => Promise<void>
   importBooks: () => Promise<void>
   openFolder: () => Promise<void>
@@ -14,7 +17,10 @@ interface LibraryState {
   closeLibraryModal: () => void
   selectBook: (filename: string) => Promise<void>
   deleteBook: (filename: string) => Promise<void>
+  processBook: (filename: string) => Promise<void>
 }
+
+let isLibraryListenerSetup = false
 
 export const useLibraryStore = create<LibraryState>((set, get) => ({
   books: [],
@@ -22,8 +28,31 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   isLibraryModalOpen: false,
   selectedBookFilename: null,
   previewBook: null,
+  processingFilenames: [],
+
+  initLibraryListeners: () => {
+    if (isLibraryListenerSetup) return
+    isLibraryListenerSetup = true
+
+    if (window.api?.onLibraryProcessingStatus) {
+      window.api.onLibraryProcessingStatus((payload) => {
+        set({ processingFilenames: payload.processingFilenames })
+      })
+    }
+
+    if (window.api?.onLibraryBooksUpdated) {
+      window.api.onLibraryBooksUpdated((updatedBooks) => {
+        set({ books: updatedBooks })
+        const { selectedBookFilename } = get()
+        if (selectedBookFilename) {
+          get().selectBook(selectedBookFilename)
+        }
+      })
+    }
+  },
 
   fetchBooks: async () => {
+    get().initLibraryListeners()
     set({ isLoading: true })
     try {
       const list = await window.api.listLibraryFiles()
@@ -34,6 +63,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   },
 
   importBooks: async () => {
+    get().initLibraryListeners()
     try {
       const res = await window.api.importLibraryFiles()
       if (res.success && res.books) {
@@ -93,6 +123,15 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
           set({ selectedBookFilename: null, previewBook: null })
         }
       }
+    } catch {
+      // ignore
+    }
+  },
+
+  processBook: async (filename: string) => {
+    try {
+      await window.api.processLibraryFile(filename)
+      await get().fetchBooks()
     } catch {
       // ignore
     }

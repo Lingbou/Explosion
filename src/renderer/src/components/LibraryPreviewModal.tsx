@@ -8,7 +8,9 @@ import {
   FolderOpen,
   Trash2,
   Search,
-  FileText
+  FileText,
+  Loader2,
+  Sparkles
 } from 'lucide-react'
 import { useLibraryStore } from '../store/libraryStore'
 import { countTextStats } from '../lib/typography'
@@ -23,7 +25,9 @@ export const LibraryPreviewModal: React.FC = () => {
     previewBook,
     importBooks,
     openFolder,
-    deleteBook
+    deleteBook,
+    processBook,
+    processingFilenames
   } = useLibraryStore()
 
   const [copied, setCopied] = useState(false)
@@ -51,8 +55,16 @@ export const LibraryPreviewModal: React.FC = () => {
     }
   }
 
+  const handleProcess = async (filename: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    await processBook(filename)
+  }
+
   const stats = previewBook ? countTextStats(previewBook.content) : null
   const sizeKb = previewBook ? (previewBook.size / 1024).toFixed(1) : '0'
+  const isCurrentBookProcessing = Boolean(
+    selectedBookFilename && processingFilenames.includes(selectedBookFilename)
+  )
 
   return (
     <div
@@ -73,6 +85,13 @@ export const LibraryPreviewModal: React.FC = () => {
             <span className="text-[10px] text-stone-400 font-mono">
               ({books.length} 部藏书)
             </span>
+
+            {processingFilenames.length > 0 && (
+              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-medium ml-2 animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin text-amber-600" />
+                <span>后台拆解处理中 ({processingFilenames.length})</span>
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -127,6 +146,7 @@ export const LibraryPreviewModal: React.FC = () => {
               ) : (
                 filteredBooks.map((book) => {
                   const isSelected = book.filename === selectedBookFilename
+                  const isProcessing = processingFilenames.includes(book.filename) || book.isProcessing
                   const kb = (book.size / 1024).toFixed(0)
 
                   return (
@@ -140,18 +160,37 @@ export const LibraryPreviewModal: React.FC = () => {
                       }`}
                     >
                       <div className="flex items-center gap-2 truncate flex-1 mr-1">
-                        <FileText
-                          className={`w-3.5 h-3.5 shrink-0 ${
-                            isSelected ? 'text-stone-800' : 'text-stone-400'
-                          }`}
-                        />
+                        {isProcessing ? (
+                          <Loader2 className="w-3.5 h-3.5 shrink-0 text-amber-600 animate-spin" />
+                        ) : (
+                          <FileText
+                            className={`w-3.5 h-3.5 shrink-0 ${
+                              isSelected ? 'text-stone-800' : 'text-stone-400'
+                            }`}
+                          />
+                        )}
                         <span className="truncate text-xs">{book.filename}</span>
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[10px] text-stone-400 font-mono">
-                          {kb}K
-                        </span>
+                        {isProcessing ? (
+                          <span className="text-[10px] text-amber-600 font-medium">处理中</span>
+                        ) : (
+                          <span className="text-[10px] text-stone-400 font-mono">
+                            {kb}K
+                          </span>
+                        )}
+
+                        {!isProcessing && book.size > 200 * 1024 && (
+                          <button
+                            onClick={(e) => handleProcess(book.filename, e)}
+                            className="p-1 text-stone-400 hover:text-amber-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="物理拆解分卷"
+                          >
+                            <Sparkles className="w-3 h-3" />
+                          </button>
+                        )}
+
                         <button
                           onClick={(e) => handleDelete(book.filename, e)}
                           className="p-1 text-stone-400 hover:text-rose-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
@@ -180,6 +219,13 @@ export const LibraryPreviewModal: React.FC = () => {
                     {stats && (
                       <span className="text-[10px] text-stone-400 font-mono">
                         · {sizeKb} KB · 约 {stats.chineseChars} 字
+                      </span>
+                    )}
+
+                    {isCurrentBookProcessing && (
+                      <span className="flex items-center gap-1 text-[10px] text-amber-600 font-medium px-2 py-0.5 rounded bg-amber-50 border border-amber-200">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <span>正在后台拆解处理中...</span>
                       </span>
                     )}
                   </div>
@@ -213,7 +259,7 @@ export const LibraryPreviewModal: React.FC = () => {
 
         {/* Modal Footer */}
         <div className="h-8 px-5 border-t border-stone-200 bg-stone-50 flex items-center justify-between text-[11px] text-stone-400 font-mono select-none shrink-0">
-          <span>本地素材原著阅读器 · 零中间转存</span>
+          <span>本地素材原著阅读器 · 导入大部头将自动执行物理分卷拆解</span>
           <button
             onClick={closeLibraryModal}
             className="text-stone-500 hover:text-stone-800 transition-colors"

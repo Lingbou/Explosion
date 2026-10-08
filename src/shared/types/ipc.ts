@@ -29,6 +29,7 @@ export interface LibraryBook {
   path: string
   size: number
   updatedAt: number
+  isProcessing?: boolean
 }
 
 export interface LibraryBookContent {
@@ -110,6 +111,9 @@ export const IPC_CHANNELS = {
   LIBRARY_OPEN_FOLDER: 'library:open-folder',
   LIBRARY_READ_CONTENT: 'library:read-content',
   LIBRARY_DELETE: 'library:delete',
+  LIBRARY_PROCESS_FILE: 'library:process-file',
+  LIBRARY_PROCESSING_STATUS: 'library:processing-status',
+  LIBRARY_BOOKS_UPDATED: 'library:books-updated',
 
   // App Utilities
   APP_GET_PATHS: 'app:get-paths',
@@ -175,6 +179,13 @@ export interface ElectronApi {
   openLibraryFolder: () => Promise<boolean>
   readLibraryFileContent: (filename: string) => Promise<LibraryBookContent>
   deleteLibraryFile: (filename: string) => Promise<boolean>
+  processLibraryFile: (filename: string) => Promise<boolean>
+  onLibraryProcessingStatus: (
+    callback: (payload: { processingFilenames: string[] }) => void
+  ) => () => void
+  onLibraryBooksUpdated: (
+    callback: (books: LibraryBook[]) => void
+  ) => () => void
 
   // App Utilities
   getAppPaths: () => Promise<AppPaths>
