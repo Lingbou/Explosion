@@ -3,9 +3,6 @@ import {
   FolderOpen,
   FolderPlus,
   Settings,
-  AlignLeft,
-  Copy,
-  Check,
   ChevronDown,
   X
 } from 'lucide-react'
@@ -20,30 +17,14 @@ export const WorkspaceToolbar: React.FC = () => {
     projectPath,
     openProject,
     createProject,
-    closeProject,
-    applyTypography,
-    chapters,
-    activeChapterId
+    closeProject
   } = useWorkspaceStore()
 
-  const [copied, setCopied] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false)
 
-  const activeChapter = chapters.find((ch) => ch.id === activeChapterId)
-
-  const handleCopyCleanText = async () => {
-    if (!activeChapter) return
-    const text = activeChapter.content
-    const success = await window.api.copyText(text)
-    if (success) {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
-
   return (
-    <div className="h-10 border-b border-stone-200 bg-white flex items-center justify-between px-3.5 select-none z-30">
+    <div className="h-10 border-b border-stone-200 bg-white flex items-center justify-between px-3.5 select-none z-30 shrink-0">
       {/* Left: Project Selector & Actions */}
       <div className="flex items-center gap-2 relative">
         <div className="relative">
@@ -53,7 +34,7 @@ export const WorkspaceToolbar: React.FC = () => {
             title="小说工程菜单"
           >
             <FolderOpen className="w-3.5 h-3.5 text-stone-500" />
-            <span className="truncate max-w-[160px] font-semibold text-stone-900">
+            <span className="truncate max-w-[180px] font-semibold text-stone-900">
               {projectPath ? projectTitle || '未命名作品' : '未打开工程'}
             </span>
             <ChevronDown className="w-3 h-3 text-stone-400" />
@@ -153,40 +134,15 @@ export const WorkspaceToolbar: React.FC = () => {
         </button>
       </div>
 
-      {/* Right Controls */}
-      <div className="flex items-center gap-1">
-        <button
-          onClick={applyTypography}
-          disabled={!projectPath || !activeChapter}
-          className="flex items-center gap-1 px-2.5 py-1 text-xs text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-md transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
-          title="应用中文出版排版规范（全角双空格缩进、标点统一）"
-        >
-          <AlignLeft className="w-3.5 h-3.5" />
-          <span>规范排版</span>
-        </button>
-
-        <button
-          onClick={handleCopyCleanText}
-          disabled={!projectPath || !activeChapter}
-          className={`flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-all disabled:opacity-40 disabled:hover:bg-transparent ${
-            copied
-              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-              : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-          }`}
-          title="一键复制纯文本手稿（完全无 Markdown 标记符号污染）"
-        >
-          {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-          <span>{copied ? '已复制' : '复制纯文本'}</span>
-        </button>
-
-        <div className="w-[1px] h-3.5 bg-stone-200 mx-1" />
-
+      {/* Right Controls: Minimal Global Settings Button */}
+      <div className="flex items-center">
         <button
           onClick={() => setIsSettingsOpen(true)}
-          className="p-1.5 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-md transition-colors"
-          title="设置"
+          className="p-1.5 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-md transition-colors flex items-center gap-1.5 text-xs font-medium"
+          title="打开全局配置"
         >
-          <Settings className="w-3.5 h-3.5" />
+          <Settings className="w-3.5 h-3.5 text-stone-500" />
+          <span>设置</span>
         </button>
       </div>
     </div>

@@ -234,14 +234,14 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
       style={{ width: `${width}px` }}
       className="border-l border-stone-200 bg-white flex flex-col justify-between select-none shrink-0 overflow-hidden relative"
     >
-      {/* Top Header: Session Management & Clean Controls */}
+      {/* Top Header: Clean Session Management */}
       <div className="h-10 px-3.5 border-b border-stone-200 flex items-center justify-between bg-white shrink-0 relative z-30">
         {/* Left: Current Session Title & History Dropdown Trigger */}
         <div ref={dropdownRef} className="relative">
           <button
             onClick={() => setIsSessionDropdownOpen(!isSessionDropdownOpen)}
             className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-stone-100 transition-colors text-left max-w-[190px]"
-            title="点击查看历史会话或切换"
+            title="点击切换或查看历史会话"
           >
             <span className="font-semibold text-xs text-stone-800 truncate">
               {currentSession?.title || '新会话'}
@@ -249,21 +249,11 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
             <ChevronDown className="w-3.5 h-3.5 text-stone-400 shrink-0" />
           </button>
 
-          {/* Sessions Dropdown Menu */}
+          {/* Sessions Dropdown Menu (Without duplicate "+ 新建" button) */}
           {isSessionDropdownOpen && (
             <div className="absolute top-8 left-0 w-64 bg-white border border-stone-200 rounded-lg shadow-xl py-1.5 z-50 text-xs font-sans animate-in fade-in duration-100">
-              <div className="px-3 py-1 text-[10px] text-stone-400 font-semibold uppercase tracking-wider border-b border-stone-100 flex items-center justify-between">
+              <div className="px-3 py-1.5 text-[10px] text-stone-400 font-semibold uppercase tracking-wider border-b border-stone-100">
                 <span>历史会话记录 ({sessions.length})</span>
-                <button
-                  onClick={() => {
-                    createSession()
-                    setIsSessionDropdownOpen(false)
-                  }}
-                  className="text-stone-700 hover:text-stone-950 font-normal flex items-center gap-0.5"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>新建</span>
-                </button>
               </div>
 
               <div className="max-h-60 overflow-y-auto p-1 space-y-0.5 scrollbar-thin">
@@ -312,7 +302,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
           )}
         </div>
 
-        {/* Right Header Controls: New Session & Clear */}
+        {/* Right Header Controls: Single Clean [+ 新建会话] & [清空] */}
         <div className="flex items-center gap-1">
           <button
             onClick={() => createSession()}
@@ -345,7 +335,6 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
         {messages.map((msg) => (
           <div key={msg.id} className="space-y-1.5 text-xs">
             <div className="text-[10px] text-stone-400 font-medium flex items-center justify-between">
-              {/* User instruction vs Explosion */}
               <span className={msg.role === 'assistant' ? 'font-semibold text-stone-700' : ''}>
                 {msg.role === 'user' ? '作者指令' : 'Explosion'}
               </span>

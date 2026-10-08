@@ -17,7 +17,7 @@ describe('organize_library.py Book Splitting Script', () => {
     }
   })
 
-  it('splits multi-volume book into individual clean UTF-8 volumes', () => {
+  it('splits multi-volume book into individual clean UTF-8 volumes and removes original large file', () => {
     const scriptPath = path.resolve(__dirname, '../src/main/library/organize_library.py')
     const bookFile = path.join(tempSandboxDir, '《大荒记》（实体版全本）作者：测试.txt')
 
@@ -41,9 +41,6 @@ describe('organize_library.py Book Splitting Script', () => {
       lines.push(`这是卷二的第 ${i} 行小说正文，古剑出鞘，龙吟彻夜。`)
     }
 
-    // Write file in GB18030 to also verify encoding detection!
-    // Note: Node.js does not have native encode for gb18030 without TextEncoder with label,
-    // but utf-8 is also verified by the python script. Let's write utf-8 and let python split it.
     fs.writeFileSync(bookFile, lines.join('\n'), 'utf-8')
 
     const outDir = path.join(tempSandboxDir, 'output')
@@ -66,5 +63,29 @@ describe('organize_library.py Book Splitting Script', () => {
     expect(vol1Content).toContain('卷一 蛮荒之境')
     expect(vol1Content).toContain('这是卷一的第 60 行')
     expect(vol1Content).not.toContain('卷二 苍云古齿')
+
+    // Original monolithic file must be automatically removed!
+    expect(fs.existsSync(bookFile)).toBe(false)
+  })
+
+  it('keeps original file when --keep-original flag is specified', () => {
+    const scriptPath = path.resolve(__dirname, '../src/main/library/organize_library.py')
+    const bookFile = path.join(tempSandboxDir, 'keep_test.txt')
+
+    const lines: string[] = ['卷一 蛮荒']
+    for (let i = 1; i <= 60; i++) lines.push(`正文 ${i}`)
+    lines.push('卷二 苍云')
+    for (let i = 1; i <= 60; i++) lines.push(`正文 ${i}`)
+
+    fs.writeFileSync(bookFile, lines.join('\n'), 'utf-8')
+
+    const outDir = path.join(tempSandboxDir, 'out_keep')
+    fs.mkdirSync(outDir, { recursive: true })
+
+    execSync(`python3 "${scriptPath}" "${bookFile}" --output-dir "${outDir}" --keep-original`, {
+      encoding: 'utf-8'
+    })
+
+    expect(fs.existsSync(bookFile)).toBe(true)
   })
 })

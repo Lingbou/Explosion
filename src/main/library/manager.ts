@@ -161,6 +161,21 @@ export class LibraryManager {
 
     return new Promise<boolean>((resolve) => {
       exec(`python3 "${scriptPath}" "${filePath}" --output-dir "${libPath}"`, (_err) => {
+        // Upon splitting into volumes, ensure the original monolithic large file is removed
+        if (fs.existsSync(filePath)) {
+          try {
+            const currentFiles = fs.readdirSync(libPath)
+            const baseName = path.basename(filename, '.txt')
+            const hasSplitVolumes = currentFiles.some(
+              (f) => f !== filename && f.includes(baseName) && (f.includes('卷') || f.includes('序言'))
+            )
+            if (hasSplitVolumes) {
+              fs.unlinkSync(filePath)
+            }
+          } catch {
+            // ignore
+          }
+        }
         this.processingFilenames.delete(filename)
         this.broadcastProcessingStatus()
         this.broadcastBooksUpdated()
