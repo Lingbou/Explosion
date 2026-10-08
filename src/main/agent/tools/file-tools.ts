@@ -1,3 +1,4 @@
+import { globalSnapshotManager } from '../../project/snapshot-manager'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -138,6 +139,15 @@ export const writeFileTool: AgentTool = {
         fs.mkdirSync(parentDir, { recursive: true })
       }
 
+            // Time-machine snapshot before AI writes
+      if (context.projectPath && fs.existsSync(resolved)) {
+        try {
+          const oldBuf = fs.readFileSync(resolved)
+          const oldText = decodeBuffer(oldBuf)
+          globalSnapshotManager.createSnapshot(context.projectPath, resolved, oldText, 'agent').catch(() => {})
+        } catch {}
+      }
+
       fs.writeFileSync(resolved, args.content, 'utf-8')
 
       // Notify live file sync if hooked
@@ -207,6 +217,13 @@ export const editFileTool: AgentTool = {
       // Count occurrences
       const occurrences = content.split(args.old_str).length - 1
       const updatedContent = content.replace(args.old_str, args.new_str)
+
+            // Time-machine snapshot before AI edits
+      if (context.projectPath && fs.existsSync(resolved)) {
+        try {
+          globalSnapshotManager.createSnapshot(context.projectPath, resolved, content, 'agent').catch(() => {})
+        } catch {}
+      }
 
       fs.writeFileSync(resolved, updatedContent, 'utf-8')
 

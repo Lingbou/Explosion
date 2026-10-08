@@ -14,7 +14,35 @@ export interface ProjectChapterFile {
   title: string
   content: string
   filename: string
+  volume?: string
+  relativePath?: string
   updatedAt: number
+}
+
+export interface StoryBibleFile {
+  id: string
+  type: 'outline' | 'character' | 'ledger'
+  title: string
+  filename: string
+  relativePath: string
+  content: string
+  updatedAt: number
+}
+
+export interface StoryBibleData {
+  outlines: StoryBibleFile[]
+  characters: StoryBibleFile[]
+  ledger: StoryBibleFile | null
+}
+
+export interface ProjectSnapshot {
+  id: string
+  filePath: string
+  filename: string
+  content?: string
+  timestamp: number
+  source: 'agent' | 'manual' | 'autosave' | 'rollback'
+  charCount: number
 }
 
 export interface ProjectData {
@@ -22,6 +50,7 @@ export interface ProjectData {
   title: string
   chapters: ProjectChapterFile[]
   activeChapterId?: string
+  storyBible?: StoryBibleData
 }
 
 export interface LibraryBook {
@@ -105,6 +134,16 @@ export const IPC_CHANNELS = {
   PROJECT_CLOSE: 'project:close',
   PROJECT_FILE_CHANGED: 'project:file-changed',
 
+  // Snapshots & Time Machine
+  SNAPSHOT_LIST: 'snapshot:list',
+  SNAPSHOT_RESTORE: 'snapshot:restore',
+  SNAPSHOT_GET_CONTENT: 'snapshot:get-content',
+
+  // Story Bible Management
+  STORY_SAVE_FILE: 'story:save-file',
+  STORY_CREATE_FILE: 'story:create-file',
+  STORY_DELETE_FILE: 'story:delete-file',
+
   // Material Library
   LIBRARY_LIST: 'library:list',
   LIBRARY_IMPORT: 'library:import',
@@ -168,6 +207,16 @@ export interface ElectronApi {
   onProjectFileChanged: (
     callback: (payload: ProjectFileChangedPayload) => void
   ) => () => void
+
+  // Snapshots & Time Machine
+  listSnapshots: (params: { projectPath: string; filename?: string }) => Promise<ProjectSnapshot[]>
+  restoreSnapshot: (params: { projectPath: string; snapshotId: string }) => Promise<{ success: boolean; filePath: string; filename: string; content: string }>
+  getSnapshotContent: (params: { projectPath: string; snapshotId: string }) => Promise<string>
+
+  // Story Bible
+  saveStoryFile: (params: { projectPath: string; relativePath: string; content: string }) => Promise<boolean>
+  createStoryFile: (params: { projectPath: string; type: 'outline' | 'character'; title: string }) => Promise<StoryBibleFile>
+  deleteStoryFile: (params: { projectPath: string; relativePath: string }) => Promise<boolean>
 
   // Library
   listLibraryFiles: () => Promise<LibraryBook[]>

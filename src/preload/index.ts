@@ -4,6 +4,8 @@ import {
   ElectronApi,
   ProjectData,
   ProjectChapterFile,
+  ProjectSnapshot,
+  StoryBibleFile,
   LibraryBook,
   LibraryBookContent,
   AgentTaskOptions,
@@ -156,6 +158,37 @@ const api: ElectronApi = {
       ipcRenderer.removeListener(IPC_CHANNELS.PROJECT_FILE_CHANGED, listener)
     }
   },
+
+  // Snapshots & Time Machine
+  listSnapshots: (params: { projectPath: string; filename?: string }): Promise<ProjectSnapshot[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SNAPSHOT_LIST, params),
+
+  restoreSnapshot: (params: {
+    projectPath: string
+    snapshotId: string
+  }): Promise<{ success: boolean; filePath: string; filename: string; content: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SNAPSHOT_RESTORE, params),
+
+  getSnapshotContent: (params: { projectPath: string; snapshotId: string }): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SNAPSHOT_GET_CONTENT, params),
+
+  // Story Bible
+  saveStoryFile: (params: {
+    projectPath: string
+    relativePath: string
+    content: string
+  }): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.STORY_SAVE_FILE, params),
+
+  createStoryFile: (params: {
+    projectPath: string
+    type: 'outline' | 'character'
+    title: string
+  }): Promise<StoryBibleFile> => ipcRenderer.invoke(IPC_CHANNELS.STORY_CREATE_FILE, params),
+
+  deleteStoryFile: (params: {
+    projectPath: string
+    relativePath: string
+  }): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.STORY_DELETE_FILE, params),
 
   // Library
   listLibraryFiles: (): Promise<LibraryBook[]> =>

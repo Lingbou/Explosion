@@ -11,6 +11,7 @@ import { globalLLMAdapter } from '../llm/adapter'
 import { globalProjectManager } from '../project/manager'
 import { globalLibraryManager } from '../library/manager'
 import { globalAgentRunner } from '../agent/runner'
+import { globalSnapshotManager } from '../project/snapshot-manager'
 
 export function registerIpcHandlers(): void {
   // Config Handlers
@@ -174,6 +175,59 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.PROJECT_CLOSE, async () => {
     return globalProjectManager.closeCurrentProject()
   })
+
+  // Snapshots & Time Machine
+  ipcMain.handle(
+    IPC_CHANNELS.SNAPSHOT_LIST,
+    async (_event, { projectPath, filename }: { projectPath: string; filename?: string }) => {
+      return globalSnapshotManager.listSnapshots(projectPath, filename)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.SNAPSHOT_RESTORE,
+    async (_event, { projectPath, snapshotId }: { projectPath: string; snapshotId: string }) => {
+      return globalSnapshotManager.restoreSnapshot(projectPath, snapshotId)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.SNAPSHOT_GET_CONTENT,
+    async (_event, { projectPath, snapshotId }: { projectPath: string; snapshotId: string }) => {
+      return globalSnapshotManager.getSnapshotContent(projectPath, snapshotId)
+    }
+  )
+
+  // Story Bible Management
+  ipcMain.handle(
+    IPC_CHANNELS.STORY_SAVE_FILE,
+    async (
+      _event,
+      { projectPath, relativePath, content }: { projectPath: string; relativePath: string; content: string }
+    ) => {
+      return globalProjectManager.saveStoryFile(projectPath, relativePath, content)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.STORY_CREATE_FILE,
+    async (
+      _event,
+      { projectPath, type, title }: { projectPath: string; type: 'outline' | 'character'; title: string }
+    ) => {
+      return globalProjectManager.createStoryFile(projectPath, type, title)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.STORY_DELETE_FILE,
+    async (
+      _event,
+      { projectPath, relativePath }: { projectPath: string; relativePath: string }
+    ) => {
+      return globalProjectManager.deleteStoryFile(projectPath, relativePath)
+    }
+  )
 
   // Library Handlers
   ipcMain.handle(IPC_CHANNELS.LIBRARY_LIST, async () => {

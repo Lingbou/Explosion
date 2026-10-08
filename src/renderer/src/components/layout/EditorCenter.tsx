@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   AlignLeft,
   Check,
@@ -8,31 +8,46 @@ import {
   FileEdit,
   FolderOpen,
   FolderPlus,
-  PenLine
+  PenLine,
+  History,
+  BookText,
+  User,
+  Bookmark
 } from 'lucide-react'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { countTextStats } from '../../lib/typography'
+import { SnapshotDrawer } from '../SnapshotDrawer'
 
 export const EditorCenter: React.FC = () => {
   const {
     projectPath,
     chapters,
     activeChapterId,
+    activeDocumentType,
+    activeStoryFile,
     updateContent,
     updateChapterTitle,
     applyTypography,
     isDirty,
-    saveActiveChapter,
+    saveActiveDocument,
     openProject,
     createProject,
     addChapter
   } = useWorkspaceStore()
 
-  const [copied, setCopied] = React.useState(false)
-  const activeChapter = chapters.find((ch) => ch.id === activeChapterId)
-  const content = activeChapter ? activeChapter.content : ''
-  const stats = countTextStats(content)
+  const [copied, setCopied] = useState(false)
+  const [isSnapshotOpen, setIsSnapshotOpen] = useState(false)
 
+  const activeChapter = chapters.find((ch) => ch.id === activeChapterId)
+
+  // Current active document details
+  const isStoryDoc = activeDocumentType === 'story' && activeStoryFile
+  const currentTitle = isStoryDoc ? activeStoryFile.title : activeChapter?.title || ''
+  const currentContent = isStoryDoc ? activeStoryFile.content : activeChapter?.content || ''
+  const currentFilename = isStoryDoc ? activeStoryFile.filename : activeChapter?.filename
+  const currentFilePath = isStoryDoc ? activeStoryFile.relativePath : activeChapter?.relativePath
+
+  const stats = countTextStats(currentContent)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Auto-resize textarea so it expands with content and NEVER displays internal scrollbars
@@ -41,20 +56,20 @@ export const EditorCenter: React.FC = () => {
       textareaRef.current.style.height = 'auto'
       textareaRef.current.style.height = `${Math.max(650, textareaRef.current.scrollHeight)}px`
     }
-  }, [content])
+  }, [currentContent])
 
   // Auto-save debounce effect
   useEffect(() => {
     if (!isDirty) return
     const timer = setTimeout(() => {
-      saveActiveChapter()
+      saveActiveDocument()
     }, 2000)
     return () => clearTimeout(timer)
-  }, [content, isDirty, saveActiveChapter])
+  }, [currentContent, isDirty, saveActiveDocument])
 
   const handleCopyCleanText = async () => {
-    if (!content) return
-    const ok = await window.api.copyText(content)
+    if (!currentContent) return
+    const ok = await window.api.copyText(currentContent)
     if (ok) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
@@ -102,7 +117,7 @@ export const EditorCenter: React.FC = () => {
   }
 
   // State 2: Project opened, but no chapters exist yet
-  if (chapters.length === 0 || !activeChapter) {
+  if (!isStoryDoc && (chapters.length === 0 || !activeChapter)) {
     return (
       <main className="flex-1 flex flex-col items-center justify-center bg-[#fbfbfa] p-8 text-center text-stone-500 text-xs">
         <div className="space-y-3">
@@ -118,25 +133,50 @@ export const EditorCenter: React.FC = () => {
     )
   }
 
-  // State 3: Active chapter editor
+  // State 3: Active document editor (manuscript or story bible)
   return (
     <main className="flex-1 flex flex-col bg-[#fbfbfa] relative overflow-hidden">
       {/* Editor Sub-header Bar */}
       <div className="h-11 border-b border-stone-200/80 px-8 flex items-center justify-between bg-white/70 backdrop-blur-xs select-none shrink-0">
-        <div className="flex items-center gap-3 flex-1 mr-4">
-          <input
-            type="text"
-            value={activeChapter.title}
-            onChange={(e) => updateChapterTitle(activeChapter.id, e.target.value)}
-            placeholder="章节标题..."
-            className="bg-transparent font-semibold text-sm text-stone-900 placeholder-stone-400 focus:outline-none px-1.5 py-0.5 rounded transition-colors w-full max-w-sm"
-          />
+        <div className="flex items-center gap-2.5 flex-1 mr-4">
+          {/* Document Type Badge */}
+          {isStoryDoc ? (
+            <span className="flex items-center gap-1 text-[11px] font-medium text-stone-600 bg-stone-100 px-2 py-0.5 rounded border border-stone-200 shrink-0">
+              {activeStoryFile.type === 'outline' && <BookText className="w-3 h-3 text-amber-700" />}
+              {activeStoryFile.type === 'character' && <User className="w-3 h-3 text-blue-700" />}
+              {activeStoryFile.type === 'ledger' && <Bookmark className="w-3 h-3 text-purple-700" />}
+              <span>
+                {activeStoryFile.type === 'outline' && '大纲规划'}
+                {activeStoryFile.type === 'character' && '人物档案'}
+                {activeStoryFile.type === 'ledger' && '伏笔账本'}
+              </span>
+            </span>
+          ) : activeChapter?.volume ? (
+            <span className="text-[10px] text-stone-400 font-medium px-1.5 py-0.5 rounded bg-stone-100 shrink-0">
+              {activeChapter.volume}
+            </span>
+          ) : null}
+
+          {/* Title Editor / Display */}
+          {isStoryDoc ? (
+            <span className="font-semibold text-sm text-stone-900 truncate">
+              {currentTitle}
+            </span>
+          ) : (
+            <input
+              type="text"
+              value={currentTitle}
+              onChange={(e) => activeChapter && updateChapterTitle(activeChapter.id, e.target.value)}
+              placeholder="章节标题..."
+              className="bg-transparent font-semibold text-sm text-stone-900 placeholder-stone-400 focus:outline-none px-1.5 py-0.5 rounded transition-colors w-full max-w-sm"
+            />
+          )}
         </div>
 
         {/* Status & Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           {/* Save Status */}
-          <div className="flex items-center gap-1.5 text-xs text-stone-400">
+          <div className="flex items-center gap-1 text-xs text-stone-400">
             {isDirty ? (
               <>
                 <FileEdit className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
@@ -152,26 +192,36 @@ export const EditorCenter: React.FC = () => {
 
           <div className="w-[1px] h-3.5 bg-stone-200" />
 
+          {/* Time Machine Button */}
+          <button
+            onClick={() => setIsSnapshotOpen(true)}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-md transition-colors"
+            title="查看与回滚历史修改版本（本地时光机防丢稿）"
+          >
+            <History className="w-3.5 h-3.5 text-stone-500" />
+            <span>时光机</span>
+          </button>
+
           {/* Quick Format & Copy */}
           <button
             onClick={applyTypography}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-md transition-colors"
+            className="flex items-center gap-1 px-2 py-1 text-xs text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-md transition-colors"
             title="应用中文出版排版规范（全角双空格缩进、标点统一）"
           >
-            <AlignLeft className="w-3.5 h-3.5" />
+            <AlignLeft className="w-3.5 h-3.5 text-stone-500" />
             <span>规范排版</span>
           </button>
 
           <button
             onClick={handleCopyCleanText}
-            className={`flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-all ${
+            className={`flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-all ${
               copied
                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                 : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
             }`}
             title="复制无 Markdown 污染的出版级纯文本"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-stone-500" />}
             <span>{copied ? '已复制' : '复制纯文本'}</span>
           </button>
         </div>
@@ -185,7 +235,7 @@ export const EditorCenter: React.FC = () => {
         <div className="w-full max-w-4xl flex flex-col">
           <textarea
             ref={textareaRef}
-            value={content}
+            value={currentContent}
             onChange={(e) => updateContent(e.target.value)}
             placeholder="在此开始写作...（纯文本无污染，静候文字流淌）"
             spellCheck={false}
@@ -214,9 +264,17 @@ export const EditorCenter: React.FC = () => {
         </div>
 
         <div className="text-stone-400 text-[10px]">
-          纯文本手稿
+          {isStoryDoc ? '本作设定文档' : '纯文本手稿'}
         </div>
       </footer>
+
+      {/* Time Machine Snapshot Drawer */}
+      <SnapshotDrawer
+        isOpen={isSnapshotOpen}
+        onClose={() => setIsSnapshotOpen(false)}
+        currentFilename={currentFilename}
+        currentFilePath={currentFilePath}
+      />
     </main>
   )
 }
