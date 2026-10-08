@@ -58,6 +58,8 @@ export interface LibraryBook {
   path: string
   size: number
   updatedAt: number
+  bookName?: string
+  relativePath?: string
   isProcessing?: boolean
 }
 
