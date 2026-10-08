@@ -14,19 +14,27 @@ vi.mock('electron', () => ({
 }))
 
 import { ProjectManager } from '../src/main/project/manager'
+import { ConfigStore } from '../src/main/config/store'
 
 describe('ProjectManager', () => {
   let tempProjectDir: string
+  let tempConfigDir: string
   let manager: ProjectManager
+  let testConfigStore: ConfigStore
 
   beforeEach(() => {
     tempProjectDir = path.join(os.tmpdir(), `explosion-project-test-${Date.now()}-${Math.random()}`)
-    manager = new ProjectManager()
+    tempConfigDir = path.join(os.tmpdir(), `explosion-config-test-${Date.now()}-${Math.random()}`)
+    testConfigStore = new ConfigStore(tempConfigDir)
+    manager = new ProjectManager(testConfigStore)
   })
 
   afterEach(() => {
     if (fs.existsSync(tempProjectDir)) {
       fs.rmSync(tempProjectDir, { recursive: true, force: true })
+    }
+    if (fs.existsSync(tempConfigDir)) {
+      fs.rmSync(tempConfigDir, { recursive: true, force: true })
     }
   })
 
@@ -39,6 +47,7 @@ describe('ProjectManager', () => {
     expect(data.chapters.length).toBe(1)
     expect(data.chapters[0].title).toBe('第一章')
     expect(data.chapters[0].filename).toBe('001-第一章.txt')
+    expect(testConfigStore.getConfig().workspace.lastProjectPath).toBe(tempProjectDir)
   })
 
   it('saves and reads chapter files directly on disk', async () => {
@@ -75,5 +84,13 @@ describe('ProjectManager', () => {
 
     manager.deleteProjectChapter(tempProjectDir, renameResult.newFilename)
     expect(fs.existsSync(path.join(tempProjectDir, 'manuscript', renameResult.newFilename))).toBe(false)
+  })
+
+  it('closes current project and sets lastProjectPath to null', async () => {
+    await manager.loadProject(tempProjectDir)
+    expect(testConfigStore.getConfig().workspace.lastProjectPath).toBe(tempProjectDir)
+
+    manager.closeCurrentProject()
+    expect(testConfigStore.getConfig().workspace.lastProjectPath).toBeNull()
   })
 })

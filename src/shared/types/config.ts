@@ -37,7 +37,7 @@ export interface ProviderConfig {
 }
 
 export interface WorkspaceConfig {
-  lastProjectPath?: string
+  lastProjectPath?: string | null
   libraryPath: string
   autoSaveIntervalMs: number
 }

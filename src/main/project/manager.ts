@@ -2,9 +2,15 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { BrowserWindow, dialog } from 'electron'
 import { ProjectChapterFile, ProjectData } from '../../shared/types/ipc'
-import { globalConfigStore } from '../config/store'
+import { ConfigStore, globalConfigStore } from '../config/store'
 
 export class ProjectManager {
+  private configStore: ConfigStore
+
+  constructor(configStore?: ConfigStore) {
+    this.configStore = configStore || globalConfigStore
+  }
+
   public async openProjectDialog(window?: BrowserWindow | null): Promise<string | null> {
     const res = await dialog.showOpenDialog(window || undefined as any, {
       title: '打开小说工程文件夹',
@@ -112,9 +118,9 @@ export class ProjectManager {
     }
 
     // Persist last opened project in app config
-    const currentConfig = globalConfigStore.getConfig()
+    const currentConfig = this.configStore.getConfig()
     currentConfig.workspace.lastProjectPath = projectPath
-    globalConfigStore.saveConfig(currentConfig)
+    this.configStore.saveConfig(currentConfig)
 
     return {
       path: projectPath,
@@ -122,6 +128,13 @@ export class ProjectManager {
       chapters,
       activeChapterId: activeChapterId || chapters[0].id
     }
+  }
+
+  public closeCurrentProject(): boolean {
+    const currentConfig = this.configStore.getConfig()
+    currentConfig.workspace.lastProjectPath = null
+    this.configStore.saveConfig(currentConfig)
+    return true
   }
 
   public saveProjectChapter(

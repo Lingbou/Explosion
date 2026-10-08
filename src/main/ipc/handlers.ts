@@ -138,6 +138,10 @@ export function registerIpcHandlers(): void {
     }
   )
 
+  ipcMain.handle(IPC_CHANNELS.PROJECT_CLOSE, async () => {
+    return globalProjectManager.closeCurrentProject()
+  })
+
   // Library Handlers
   ipcMain.handle(IPC_CHANNELS.LIBRARY_LIST, async () => {
     return globalLibraryManager.listLibraryFiles()

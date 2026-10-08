@@ -58,6 +58,7 @@ export const IPC_CHANNELS = {
   PROJECT_RENAME_CHAPTER: 'project:rename-chapter',
   PROJECT_DELETE_CHAPTER: 'project:delete-chapter',
   PROJECT_SAVE_META: 'project:save-meta',
+  PROJECT_CLOSE: 'project:close',
 
   // Material Library
   LIBRARY_LIST: 'library:list',
@@ -108,6 +109,7 @@ export interface ElectronApi {
     filename: string
   }) => Promise<boolean>
   saveProjectMeta: (params: { projectPath: string; title: string }) => Promise<boolean>
+  closeProject: () => Promise<boolean>
 
   // Library
   listLibraryFiles: () => Promise<LibraryBook[]>

@@ -101,6 +101,8 @@ const api: ElectronApi = {
   saveProjectMeta: (params: { projectPath: string; title: string }): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.PROJECT_SAVE_META, params),
 
+  closeProject: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_CLOSE),
+
   // Library
   listLibraryFiles: (): Promise<LibraryBook[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.LIBRARY_LIST),

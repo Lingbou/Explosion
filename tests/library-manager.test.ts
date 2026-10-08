@@ -14,26 +14,33 @@ vi.mock('electron', () => ({
 }))
 
 import { LibraryManager } from '../src/main/library/manager'
-import { globalConfigStore } from '../src/main/config/store'
+import { ConfigStore } from '../src/main/config/store'
 
 describe('LibraryManager', () => {
   let tempLibDir: string
+  let tempConfigDir: string
+  let testConfigStore: ConfigStore
   let manager: LibraryManager
 
   beforeEach(() => {
     tempLibDir = path.join(os.tmpdir(), `explosion-lib-test-${Date.now()}-${Math.random()}`)
+    tempConfigDir = path.join(os.tmpdir(), `explosion-cfg-test-${Date.now()}-${Math.random()}`)
     fs.mkdirSync(tempLibDir, { recursive: true })
 
-    const config = globalConfigStore.getConfig()
+    testConfigStore = new ConfigStore(tempConfigDir)
+    const config = testConfigStore.getConfig()
     config.workspace.libraryPath = tempLibDir
-    globalConfigStore.saveConfig(config)
+    testConfigStore.saveConfig(config)
 
-    manager = new LibraryManager()
+    manager = new LibraryManager(testConfigStore)
   })
 
   afterEach(() => {
     if (fs.existsSync(tempLibDir)) {
       fs.rmSync(tempLibDir, { recursive: true, force: true })
+    }
+    if (fs.existsSync(tempConfigDir)) {
+      fs.rmSync(tempConfigDir, { recursive: true, force: true })
     }
   })
 
