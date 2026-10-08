@@ -176,6 +176,43 @@ const api: ElectronApi = {
   deleteLibraryFile: (filename: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.LIBRARY_DELETE, filename),
 
+  processLibraryFile: (filename: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LIBRARY_PROCESS_FILE, filename),
+
+  onLibraryProcessingStatus: (
+    callback: (payload: { processingFilenames: string[] }) => void
+  ): (() => void) => {
+    const listener = (
+      _event: IpcRendererEvent,
+      payload: { processingFilenames: string[] }
+    ): void => {
+      callback(payload)
+    }
+
+    ipcRenderer.on(IPC_CHANNELS.LIBRARY_PROCESSING_STATUS, listener)
+
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.LIBRARY_PROCESSING_STATUS, listener)
+    }
+  },
+
+  onLibraryBooksUpdated: (
+    callback: (books: LibraryBook[]) => void
+  ): (() => void) => {
+    const listener = (
+      _event: IpcRendererEvent,
+      books: LibraryBook[]
+    ): void => {
+      callback(books)
+    }
+
+    ipcRenderer.on(IPC_CHANNELS.LIBRARY_BOOKS_UPDATED, listener)
+
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.LIBRARY_BOOKS_UPDATED, listener)
+    }
+  },
+
   // App Utilities
   getAppPaths: (): Promise<AppPaths> => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_PATHS),
 

@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { AgentStreamEvent, AgentTaskOptions } from '../../../shared/types/ipc'
+import { stripMarkdownMarks } from '../lib/typography'
+import { generateSessionTitle } from "../../../shared/utils/session"
 
 export interface AgentTraceStep {
   id: string
@@ -22,14 +24,29 @@ export interface AgentMessage {
   timestamp: number
 }
 
-interface AgentState {
+export interface AgentSession {
+  id: string
+  title: string
   messages: AgentMessage[]
+  createdAt: number
+  updatedAt: number
+}
+
+interface AgentState {
+  sessions: AgentSession[]
+  activeSessionId: string
   isRunning: boolean
   currentTaskId: string | null
   currentThinking: string
   currentDelta: string
   currentTraces: AgentTraceStep[]
+
+  createSession: () => string
+  switchSession: (sessionId: string) => void
+  deleteSession: (sessionId: string) => void
+  renameSession: (sessionId: string, title: string) => void
   clearMessages: () => void
+
   sendTask: (
     prompt: string,
     contextParams: {
@@ -41,19 +58,156 @@ interface AgentState {
   abortTask: () => void
 }
 
+const STORAGE_KEY_SESSIONS = 'explosion:agent-sessions'
+const STORAGE_KEY_ACTIVE_ID = 'explosion:agent-active-session-id'
+
+export { generateSessionTitle } from '../../../shared/utils/session'
+
+
+function loadInitialSessions(): { sessions: AgentSession[]; activeSessionId: string } {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_SESSIONS)
+    if (raw) {
+      const parsed = JSON.parse(raw) as AgentSession[]
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const savedActiveId = localStorage.getItem(STORAGE_KEY_ACTIVE_ID)
+        const activeId = savedActiveId && parsed.some((s) => s.id === savedActiveId)
+          ? savedActiveId
+          : parsed[0].id
+        return { sessions: parsed, activeSessionId: activeId }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  const initialSession: AgentSession = {
+    id: `session-${Date.now()}`,
+    title: '新会话',
+    messages: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  }
+
+  return { sessions: [initialSession], activeSessionId: initialSession.id }
+}
+
+function saveSessionsToStorage(sessions: AgentSession[], activeId: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(sessions))
+    localStorage.setItem(STORAGE_KEY_ACTIVE_ID, activeId)
+  } catch {
+    // ignore
+  }
+}
+
+const initialData = loadInitialSessions()
+
 export const useAgentStore = create<AgentState>((set, get) => ({
-  messages: [],
+  sessions: initialData.sessions,
+  activeSessionId: initialData.activeSessionId,
   isRunning: false,
   currentTaskId: null,
   currentThinking: '',
   currentDelta: '',
   currentTraces: [],
 
-  clearMessages: () => set({ messages: [], currentThinking: '', currentDelta: '', currentTraces: [] }),
+  createSession: () => {
+    const newSession: AgentSession = {
+      id: `session-${Date.now()}`,
+      title: '新会话',
+      messages: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    }
+
+    const updatedSessions = [newSession, ...get().sessions]
+    set({
+      sessions: updatedSessions,
+      activeSessionId: newSession.id,
+      currentThinking: '',
+      currentDelta: '',
+      currentTraces: []
+    })
+    saveSessionsToStorage(updatedSessions, newSession.id)
+    return newSession.id
+  },
+
+  switchSession: (sessionId: string) => {
+    const target = get().sessions.find((s) => s.id === sessionId)
+    if (!target) return
+    set({
+      activeSessionId: sessionId,
+      currentThinking: '',
+      currentDelta: '',
+      currentTraces: []
+    })
+    saveSessionsToStorage(get().sessions, sessionId)
+  },
+
+  deleteSession: (sessionId: string) => {
+    const { sessions, activeSessionId } = get()
+    const remaining = sessions.filter((s) => s.id !== sessionId)
+
+    if (remaining.length === 0) {
+      const freshSession: AgentSession = {
+        id: `session-${Date.now()}`,
+        title: '新会话',
+        messages: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+      set({ sessions: [freshSession], activeSessionId: freshSession.id })
+      saveSessionsToStorage([freshSession], freshSession.id)
+      return
+    }
+
+    let nextActiveId = activeSessionId
+    if (activeSessionId === sessionId) {
+      nextActiveId = remaining[0].id
+    }
+
+    set({ sessions: remaining, activeSessionId: nextActiveId })
+    saveSessionsToStorage(remaining, nextActiveId)
+  },
+
+  renameSession: (sessionId: string, title: string) => {
+    const updated = get().sessions.map((s) =>
+      s.id === sessionId ? { ...s, title: title.trim() || '未命名会话', updatedAt: Date.now() } : s
+    )
+    set({ sessions: updated })
+    saveSessionsToStorage(updated, get().activeSessionId)
+  },
+
+  clearMessages: () => {
+    const { sessions, activeSessionId } = get()
+    const updated = sessions.map((s) =>
+      s.id === activeSessionId ? { ...s, messages: [], updatedAt: Date.now() } : s
+    )
+    set({
+      sessions: updated,
+      currentThinking: '',
+      currentDelta: '',
+      currentTraces: []
+    })
+    saveSessionsToStorage(updated, activeSessionId)
+  },
 
   sendTask: async (prompt: string, contextParams) => {
-    const { messages, isRunning } = get()
+    const { sessions, activeSessionId, isRunning } = get()
     if (isRunning || !prompt.trim()) return
+
+    let currentSession = sessions.find((s) => s.id === activeSessionId)
+    if (!currentSession) {
+      const newId = get().createSession()
+      currentSession = get().sessions.find((s) => s.id === newId)!
+    }
+
+    // Auto generate title on first user message
+    let sessionTitle = currentSession.title
+    if (currentSession.messages.length === 0 || currentSession.title === '新会话') {
+      sessionTitle = generateSessionTitle(prompt)
+    }
 
     const userMessage: AgentMessage = {
       id: `msg-${Date.now()}-u`,
@@ -62,13 +216,21 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       timestamp: Date.now()
     }
 
+    const updatedMessagesWithUser = [...currentSession.messages, userMessage]
+    const updatedSessionsWithUser = get().sessions.map((s) =>
+      s.id === currentSession!.id
+        ? { ...s, title: sessionTitle, messages: updatedMessagesWithUser, updatedAt: Date.now() }
+        : s
+    )
+
     set({
-      messages: [...messages, userMessage],
+      sessions: updatedSessionsWithUser,
       isRunning: true,
       currentThinking: '',
       currentDelta: '',
       currentTraces: []
     })
+    saveSessionsToStorage(updatedSessionsWithUser, currentSession.id)
 
     const taskOptions: AgentTaskOptions = {
       userPrompt: prompt.trim(),
@@ -115,23 +277,33 @@ export const useAgentStore = create<AgentState>((set, get) => ({
           )
           set({ currentTraces: tracesList })
         } else if (event.type === 'done') {
+          // Strictly sanitize markdown symbols out of content!
+          const cleanOutput = stripMarkdownMarks(accumulatedDelta)
+
           const assistantMsg: AgentMessage = {
             id: `msg-${Date.now()}-a`,
             role: 'assistant',
-            content: accumulatedDelta || (tracesList.length > 0 ? '已完成所有自主工具调用调度。' : '完成。'),
+            content: cleanOutput || (tracesList.length > 0 ? '已完成所有自主工具调用调度。' : '完成。'),
             thinking: accumulatedThinking || undefined,
             traces: tracesList.length > 0 ? tracesList : undefined,
             timestamp: Date.now()
           }
 
-          set((state) => ({
-            messages: [...state.messages, assistantMsg],
+          const finalizedSessions = get().sessions.map((s) =>
+            s.id === currentSession!.id
+              ? { ...s, messages: [...s.messages, assistantMsg], updatedAt: Date.now() }
+              : s
+          )
+
+          set({
+            sessions: finalizedSessions,
             isRunning: false,
             currentTaskId: null,
             currentThinking: '',
             currentDelta: '',
             currentTraces: []
-          }))
+          })
+          saveSessionsToStorage(finalizedSessions, currentSession.id)
           handle.unsubscribe()
         } else if (event.type === 'error') {
           const errorMsg: AgentMessage = {
@@ -142,14 +314,21 @@ export const useAgentStore = create<AgentState>((set, get) => ({
             timestamp: Date.now()
           }
 
-          set((state) => ({
-            messages: [...state.messages, errorMsg],
+          const finalizedSessions = get().sessions.map((s) =>
+            s.id === currentSession!.id
+              ? { ...s, messages: [...s.messages, errorMsg], updatedAt: Date.now() }
+              : s
+          )
+
+          set({
+            sessions: finalizedSessions,
             isRunning: false,
             currentTaskId: null,
             currentThinking: '',
             currentDelta: '',
             currentTraces: []
-          }))
+          })
+          saveSessionsToStorage(finalizedSessions, currentSession.id)
           handle.unsubscribe()
         }
       })
@@ -162,14 +341,22 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         content: `[调度异常]: ${err instanceof Error ? err.message : String(err)}`,
         timestamp: Date.now()
       }
-      set((state) => ({
-        messages: [...state.messages, errorMsg],
+
+      const finalizedSessions = get().sessions.map((s) =>
+        s.id === currentSession!.id
+          ? { ...s, messages: [...s.messages, errorMsg], updatedAt: Date.now() }
+          : s
+      )
+
+      set({
+        sessions: finalizedSessions,
         isRunning: false,
         currentTaskId: null,
         currentThinking: '',
         currentDelta: '',
         currentTraces: []
-      }))
+      })
+      saveSessionsToStorage(finalizedSessions, currentSession.id)
     }
   },
 

@@ -2,8 +2,6 @@ import React, { useState, useRef, useEffect } from 'react'
 import {
   Send,
   Square,
-  Check,
-  Copy,
   Terminal,
   Search,
   Globe,
@@ -15,10 +13,14 @@ import {
   ChevronRight,
   Loader2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Plus,
+  MessageSquare,
+  Trash2
 } from 'lucide-react'
 import { useAgentStore, AgentTraceStep } from '../../store/agentStore'
 import { useWorkspaceStore } from '../../store/workspaceStore'
+import { stripMarkdownMarks } from '../../lib/typography'
 
 interface RightPanelProps {
   width: number
@@ -169,28 +171,51 @@ const TraceCard: React.FC<{ trace: AgentTraceStep }> = ({ trace }) => {
 
 export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
   const {
-    messages,
+    sessions,
+    activeSessionId,
     isRunning,
     currentThinking,
     currentDelta,
     currentTraces,
     sendTask,
     abortTask,
+    createSession,
+    switchSession,
+    deleteSession,
     clearMessages
   } = useAgentStore()
 
-  const { projectPath, projectTitle, chapters, activeChapterId } = useWorkspaceStore()
+  const { projectPath, chapters, activeChapterId } = useWorkspaceStore()
 
   const [inputPrompt, setInputPrompt] = useState('')
-  const [copiedId, setCopiedId] = useState<string | null>(null)
   const [showThinkingMap, setShowThinkingMap] = useState<Record<string, boolean>>({})
+  const [isSessionDropdownOpen, setIsSessionDropdownOpen] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const activeChapter = chapters.find((ch) => ch.id === activeChapterId)
+
+  const currentSession = sessions.find((s) => s.id === activeSessionId) || sessions[0]
+  const messages = currentSession?.messages || []
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, currentDelta, currentThinking, currentTraces])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsSessionDropdownOpen(false)
+      }
+    }
+    if (isSessionDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isSessionDropdownOpen])
 
   const handleSend = () => {
     const textToSend = inputPrompt.trim()
@@ -204,36 +229,109 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
     })
   }
 
-  const handleCopyText = async (id: string, text: string) => {
-    const ok = await window.api.copyText(text)
-    if (ok) {
-      setCopiedId(id)
-      setTimeout(() => setCopiedId(null), 1500)
-    }
-  }
-
-  // Header Title: Clean Project Name (or 'Explosion')
-  const panelTitle = projectTitle?.trim() || 'Explosion'
-
   return (
     <aside
       style={{ width: `${width}px` }}
-      className="border-l border-stone-200 bg-white flex flex-col justify-between select-none shrink-0 overflow-hidden"
+      className="border-l border-stone-200 bg-white flex flex-col justify-between select-none shrink-0 overflow-hidden relative"
     >
-      {/* Top Header: Clean Project Name on Left, Quiet Clear Button on Right */}
-      <div className="h-10 px-4 border-b border-stone-200 flex items-center justify-between bg-white shrink-0">
-        <span className="font-semibold text-xs text-stone-800 truncate" title={panelTitle}>
-          {panelTitle}
-        </span>
-
-        {messages.length > 0 && (
+      {/* Top Header: Session Management & Clean Controls */}
+      <div className="h-10 px-3.5 border-b border-stone-200 flex items-center justify-between bg-white shrink-0 relative z-30">
+        {/* Left: Current Session Title & History Dropdown Trigger */}
+        <div ref={dropdownRef} className="relative">
           <button
-            onClick={clearMessages}
-            className="text-[10px] text-stone-400 hover:text-stone-700 transition-colors"
+            onClick={() => setIsSessionDropdownOpen(!isSessionDropdownOpen)}
+            className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-stone-100 transition-colors text-left max-w-[190px]"
+            title="点击查看历史会话或切换"
           >
-            清空
+            <span className="font-semibold text-xs text-stone-800 truncate">
+              {currentSession?.title || '新会话'}
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 text-stone-400 shrink-0" />
           </button>
-        )}
+
+          {/* Sessions Dropdown Menu */}
+          {isSessionDropdownOpen && (
+            <div className="absolute top-8 left-0 w-64 bg-white border border-stone-200 rounded-lg shadow-xl py-1.5 z-50 text-xs font-sans animate-in fade-in duration-100">
+              <div className="px-3 py-1 text-[10px] text-stone-400 font-semibold uppercase tracking-wider border-b border-stone-100 flex items-center justify-between">
+                <span>历史会话记录 ({sessions.length})</span>
+                <button
+                  onClick={() => {
+                    createSession()
+                    setIsSessionDropdownOpen(false)
+                  }}
+                  className="text-stone-700 hover:text-stone-950 font-normal flex items-center gap-0.5"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>新建</span>
+                </button>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto p-1 space-y-0.5 scrollbar-thin">
+                {sessions.map((sess) => {
+                  const isActive = sess.id === activeSessionId
+                  return (
+                    <div
+                      key={sess.id}
+                      onClick={() => {
+                        switchSession(sess.id)
+                        setIsSessionDropdownOpen(false)
+                      }}
+                      className={`group flex items-center justify-between px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${
+                        isActive
+                          ? 'bg-stone-100 text-stone-900 font-medium'
+                          : 'text-stone-600 hover:bg-stone-50 hover:text-stone-900'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate flex-1 mr-1">
+                        <MessageSquare className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                        <span className="truncate text-xs">{sess.title}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[10px] text-stone-300 font-mono">
+                          {sess.messages.length}条
+                        </span>
+                        {sessions.length > 1 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              deleteSession(sess.id)
+                            }}
+                            className="p-0.5 text-stone-400 hover:text-rose-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="删除此会话"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Header Controls: New Session & Clear */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => createSession()}
+            className="flex items-center gap-1 px-2 py-1 rounded text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-colors text-xs font-medium"
+            title="开启全新会话"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>新建会话</span>
+          </button>
+
+          {messages.length > 0 && (
+            <button
+              onClick={clearMessages}
+              className="text-[10px] text-stone-400 hover:text-stone-700 transition-colors px-1.5 py-1"
+            >
+              清空
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Messages Feed */}
@@ -247,7 +345,10 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
         {messages.map((msg) => (
           <div key={msg.id} className="space-y-1.5 text-xs">
             <div className="text-[10px] text-stone-400 font-medium flex items-center justify-between">
-              <span>{msg.role === 'user' ? '作者指令' : '助手执行'}</span>
+              {/* User instruction vs Explosion */}
+              <span className={msg.role === 'assistant' ? 'font-semibold text-stone-700' : ''}>
+                {msg.role === 'user' ? '作者指令' : 'Explosion'}
+              </span>
               <span className="text-[9px] text-stone-300 font-mono">
                 {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
@@ -292,23 +393,9 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
                   </div>
                 )}
 
-                {/* Final Content */}
+                {/* Final Content: Clean Pure Text with Zero Markdown Pollution */}
                 <div className="p-3 rounded-lg border border-stone-200 bg-white text-stone-900 font-serif leading-relaxed select-text shadow-2xs whitespace-pre-wrap">
-                  {msg.content}
-
-                  <div className="mt-2 pt-2 border-t border-stone-100 flex items-center justify-end font-sans">
-                    <button
-                      onClick={() => handleCopyText(msg.id, msg.content)}
-                      className="flex items-center gap-1 text-[11px] text-stone-400 hover:text-stone-700 transition-colors"
-                    >
-                      {copiedId === msg.id ? (
-                        <Check className="w-3 h-3 text-emerald-600" />
-                      ) : (
-                        <Copy className="w-3 h-3" />
-                      )}
-                      <span>{copiedId === msg.id ? '已复制' : '复制回复'}</span>
-                    </button>
-                  </div>
+                  {stripMarkdownMarks(msg.content)}
                 </div>
               </div>
             )}
@@ -320,7 +407,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
           <div className="space-y-2 text-xs">
             <div className="text-[10px] text-stone-500 font-medium flex items-center gap-1.5">
               <Loader2 className="w-3 h-3 animate-spin text-stone-600" />
-              <span>助手执行中...</span>
+              <span>Explosion 执行中...</span>
             </div>
 
             {/* Live Thinking */}
@@ -343,7 +430,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
             {/* Live Delta */}
             {currentDelta && (
               <div className="p-3 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 font-serif leading-relaxed whitespace-pre-wrap">
-                {currentDelta}
+                {stripMarkdownMarks(currentDelta)}
                 <span className="inline-block w-1.5 h-3 ml-1 bg-stone-700 animate-pulse" />
               </div>
             )}
@@ -353,7 +440,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area (Clean & Pure, without unnecessary chips) */}
+      {/* Input Area (Clean & Pure) */}
       <div className="p-3 border-t border-stone-200 bg-white shrink-0">
         <div className="relative flex items-end bg-stone-50 border border-stone-200 rounded-lg p-1.5 focus-within:border-stone-400 focus-within:bg-white transition-all">
           <textarea

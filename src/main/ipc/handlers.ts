@@ -197,6 +197,10 @@ export function registerIpcHandlers(): void {
     return globalLibraryManager.deleteLibraryFile(filename)
   })
 
+  ipcMain.handle(IPC_CHANNELS.LIBRARY_PROCESS_FILE, async (_event, filename: string) => {
+    return globalLibraryManager.processLibraryFile(filename)
+  })
+
   // App Utilities
   ipcMain.handle(IPC_CHANNELS.APP_GET_PATHS, async () => {
     return globalConfigStore.getPaths()
