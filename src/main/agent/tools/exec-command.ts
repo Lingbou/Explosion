@@ -3,6 +3,7 @@ import os from 'os'
 import path from 'path'
 import fs from 'fs'
 import { AgentTool, AgentToolContext } from './types'
+import { validateCommandSafety, validateSandboxPath } from './sandbox'
 
 const MAX_OUTPUT_LENGTH = 30000
 
@@ -40,7 +41,7 @@ export function truncateOutput(output: string, maxLength: number = MAX_OUTPUT_LE
 export const execCommandTool: AgentTool = {
   name: 'exec_command',
   description:
-    '在宿主系统终端中执行命令（如 bash/python/git 等脚本或工具），捕获并返回 exitCode、stdout 和 stderr。用于运行拆书脚本、批量处理数据、查看系统状态或执行自动化脚本。',
+    '在宿主系统终端中执行命令（如 python 脚本、git 或数据处理工具），捕获并返回 exitCode、stdout 和 stderr。执行目录严格隔离在小说工程目录或 ~/.explosion/ 内。',
   parameters: {
     type: 'object',
     properties: {
@@ -50,7 +51,7 @@ export const execCommandTool: AgentTool = {
       },
       cwd: {
         type: 'string',
-        description: '执行命令的工作目录（可选）。留空则优先使用当前小说工程目录或 ~/.explosion'
+        description: '执行命令的工作目录（可选）。受轻沙箱限制，仅允许在当前小说工程目录或 ~/.explosion 下执行'
       },
       timeout_ms: {
         type: 'number',
@@ -65,7 +66,22 @@ export const execCommandTool: AgentTool = {
       return '执行失败: 未提供有效的 command 命令内容。'
     }
 
-    const workingDir = resolveWorkingDir(args.cwd, context.projectPath)
+    // Command Safety Defense
+    const cmdCheck = validateCommandSafety(rawCmd)
+    if (!cmdCheck.safe) {
+      return cmdCheck.reason || '[轻沙箱安全拦截]: 检测到高危破坏性系统指令，已安全拦截。'
+    }
+
+    // CWD Sandbox Defense: ensure cwd is inside whitelist roots
+    let workingDir = resolveWorkingDir(args.cwd, context.projectPath)
+    const cwdCheck = validateSandboxPath(workingDir, context)
+    if (!cwdCheck.allowed) {
+      // Fall back to project path or ~/.explosion
+      workingDir = context.projectPath && fs.existsSync(context.projectPath)
+        ? path.resolve(context.projectPath)
+        : path.resolve(path.join(os.homedir(), '.explosion'))
+    }
+
     const timeout = typeof args.timeout_ms === 'number' && args.timeout_ms > 0 ? args.timeout_ms : 120000
 
     return new Promise<string>((resolve) => {
