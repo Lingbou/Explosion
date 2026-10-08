@@ -3,7 +3,7 @@
 """
 Explosion 藏书库大部头物理拆解器 (Organize Library)
 用途：自动识别 GB18030 / GBK / UTF-8 编码，对大篇幅合集小说进行物理拆卷，
-输出干净、独立的单卷 UTF-8 纯文本文件，彻底解决大部头小说无法被大模型与向量索引精细处理的问题。
+输出干净、独立的单卷 UTF-8 纯文本文件，并在拆解成功后自动删除冗余的原始大文件。
 """
 
 import os
@@ -34,7 +34,7 @@ def clean_book_title(filename: str) -> str:
     name = re.sub(r'作者[：:].*$', '', name).strip()
     return name or '作品'
 
-def split_book_by_volumes(file_path: str, output_dir: Optional[str] = None) -> List[str]:
+def split_book_by_volumes(file_path: str, output_dir: Optional[str] = None, remove_original: bool = True) -> List[str]:
     if not os.path.exists(file_path):
         print(f"错误: 目标文件不存在 -> {file_path}", file=sys.stderr)
         return []
@@ -98,12 +98,24 @@ def split_book_by_volumes(file_path: str, output_dir: Optional[str] = None) -> L
 
         created_files.append(file_path_out)
 
+    # Automatically clean up the original monolithic large file upon successful splitting
+    if remove_original and len(created_files) > 1:
+        try:
+            if os.path.exists(file_path):
+                # Ensure we don't accidentally remove an output file if names collided
+                if os.path.abspath(file_path) not in [os.path.abspath(c) for c in created_files]:
+                    os.remove(file_path)
+                    print(f"已自动清理原始大文件: {os.path.basename(file_path)}")
+        except Exception as e:
+            print(f"清理原始大文件提示: {e}", file=sys.stderr)
+
     return created_files
 
 def main():
     parser = argparse.ArgumentParser(description="Explosion 藏书库物理分卷拆解工具")
     parser.add_argument("target", nargs="?", default=None, help="目标大 TXT 文件路径或藏书库目录")
     parser.add_argument("--output-dir", "-o", default=None, help="输出文件夹，默认存放于目标文件同级目录")
+    parser.add_argument("--keep-original", action="store_true", help="拆解完成后保留原始大文件（默认自动清理）")
     args = parser.parse_args()
 
     default_lib = os.path.expanduser("~/.explosion/library")
@@ -111,6 +123,8 @@ def main():
 
     if not target:
         target = default_lib
+
+    remove_orig = not args.keep_original
 
     if os.path.isdir(target):
         # Scan all .txt in directory
@@ -124,14 +138,14 @@ def main():
             size_mb = os.path.getsize(tf) / (1024 * 1024)
             if size_mb >= 0.5:  # Greater than 500KB
                 print(f"\n发现大部头书籍: {os.path.basename(tf)} ({size_mb:.2f} MB)")
-                created = split_book_by_volumes(tf, args.output_dir)
+                created = split_book_by_volumes(tf, args.output_dir, remove_original=remove_orig)
                 if created:
                     print(f"成功物理拆解为 {len(created)} 个单卷文件 (UTF-8 编码):")
                     for c in created:
                         sz = os.path.getsize(c) / 1024
                         print(f"  - {os.path.basename(c)} ({sz:.1f} KB)")
     else:
-        created = split_book_by_volumes(target, args.output_dir)
+        created = split_book_by_volumes(target, args.output_dir, remove_original=remove_orig)
         if created:
             print(f"成功物理拆解为 {len(created)} 个单卷文件 (UTF-8 编码):")
             for c in created:

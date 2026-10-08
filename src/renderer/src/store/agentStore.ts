@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import { AgentStreamEvent, AgentTaskOptions } from '../../../shared/types/ipc'
 import { stripMarkdownMarks } from '../lib/typography'
-import { generateSessionTitle } from "../../../shared/utils/session"
+import { generateSessionTitle } from '../../../shared/utils/session'
+
+export { generateSessionTitle } from '../../../shared/utils/session'
 
 export interface AgentTraceStep {
   id: string
@@ -61,20 +63,21 @@ interface AgentState {
 const STORAGE_KEY_SESSIONS = 'explosion:agent-sessions'
 const STORAGE_KEY_ACTIVE_ID = 'explosion:agent-active-session-id'
 
-export { generateSessionTitle } from '../../../shared/utils/session'
-
-
 function loadInitialSessions(): { sessions: AgentSession[]; activeSessionId: string } {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_SESSIONS)
     if (raw) {
       const parsed = JSON.parse(raw) as AgentSession[]
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const savedActiveId = localStorage.getItem(STORAGE_KEY_ACTIVE_ID)
-        const activeId = savedActiveId && parsed.some((s) => s.id === savedActiveId)
-          ? savedActiveId
-          : parsed[0].id
-        return { sessions: parsed, activeSessionId: activeId }
+        // Filter out legacy empty sessions from storage
+        const meaningful = parsed.filter((s) => s.messages && s.messages.length > 0)
+        if (meaningful.length > 0) {
+          const savedActiveId = localStorage.getItem(STORAGE_KEY_ACTIVE_ID)
+          const activeId = savedActiveId && meaningful.some((s) => s.id === savedActiveId)
+            ? savedActiveId
+            : meaningful[0].id
+          return { sessions: meaningful, activeSessionId: activeId }
+        }
       }
     }
   } catch {
@@ -94,7 +97,9 @@ function loadInitialSessions(): { sessions: AgentSession[]; activeSessionId: str
 
 function saveSessionsToStorage(sessions: AgentSession[], activeId: string): void {
   try {
-    localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(sessions))
+    // Only persist sessions with messages, plus active session if it's currently selected
+    const toSave = sessions.filter((s) => s.messages.length > 0 || s.id === activeId)
+    localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(toSave))
     localStorage.setItem(STORAGE_KEY_ACTIVE_ID, activeId)
   } catch {
     // ignore
@@ -113,6 +118,14 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   currentTraces: [],
 
   createSession: () => {
+    const { sessions, activeSessionId } = get()
+    const current = sessions.find((s) => s.id === activeSessionId)
+
+    // Prohibit duplicate empty sessions: if current session has 0 messages, do not create a new one!
+    if (current && current.messages.length === 0) {
+      return current.id
+    }
+
     const newSession: AgentSession = {
       id: `session-${Date.now()}`,
       title: '新会话',
@@ -121,7 +134,10 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       updatedAt: Date.now()
     }
 
-    const updatedSessions = [newSession, ...get().sessions]
+    // Clean up any other idle empty sessions from list
+    const filteredSessions = sessions.filter((s) => s.messages.length > 0)
+    const updatedSessions = [newSession, ...filteredSessions]
+
     set({
       sessions: updatedSessions,
       activeSessionId: newSession.id,
@@ -134,15 +150,23 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   },
 
   switchSession: (sessionId: string) => {
-    const target = get().sessions.find((s) => s.id === sessionId)
+    const { sessions, activeSessionId } = get()
+    const target = sessions.find((s) => s.id === sessionId)
     if (!target) return
+
+    // Clean up current active session if it had 0 messages when switching away
+    const cleaned = sessions.filter(
+      (s) => s.id === sessionId || s.messages.length > 0
+    )
+
     set({
+      sessions: cleaned,
       activeSessionId: sessionId,
       currentThinking: '',
       currentDelta: '',
       currentTraces: []
     })
-    saveSessionsToStorage(get().sessions, sessionId)
+    saveSessionsToStorage(cleaned, sessionId)
   },
 
   deleteSession: (sessionId: string) => {
