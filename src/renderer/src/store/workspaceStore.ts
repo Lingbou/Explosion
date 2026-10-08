@@ -1,34 +1,46 @@
 import { create } from 'zustand'
 import { formatChineseManuscript } from '../lib/typography'
 import { getNextChapterTitle } from '../../../shared/utils/chineseNumerals'
+import { ProjectChapterFile, StoryBibleData, StoryBibleFile } from '../../../shared/types/ipc'
 
-export interface Chapter {
-  id: string
-  title: string
-  content: string
-  filename: string
-  updatedAt: number
-}
+export type Chapter = ProjectChapterFile
 
 interface WorkspaceState {
   projectPath: string | null
   projectTitle: string
   chapters: Chapter[]
   activeChapterId: string
+
+  // Story Bible & Active Document
+  storyBible: StoryBibleData | null
+  activeDocumentType: 'chapter' | 'story'
+  activeStoryFile: StoryBibleFile | null
+
   isDirty: boolean
   lastSavedAt: number | null
+
   initWorkspace: (lastProjectPath?: string | null) => Promise<void>
   openProject: () => Promise<void>
   createProject: () => Promise<void>
   loadProjectByPath: (path: string) => Promise<void>
   closeProject: () => Promise<void>
   setProjectTitle: (title: string) => void
+
+  // Manuscript Actions
   selectChapter: (id: string) => void
   updateContent: (content: string) => void
   updateChapterTitle: (id: string, title: string) => Promise<void>
-  addChapter: (customTitle?: string) => Promise<void>
+  addChapter: (customTitle?: string, volume?: string) => Promise<void>
   deleteChapter: (id: string) => Promise<void>
+
+  // Story Bible Actions
+  selectStoryFile: (file: StoryBibleFile) => void
+  createStoryFile: (type: 'outline' | 'character', title?: string) => Promise<void>
+  deleteStoryFile: (relativePath: string) => Promise<void>
+
+  // Common Actions
   applyTypography: () => void
+  saveActiveDocument: () => Promise<void>
   saveActiveChapter: () => Promise<void>
   insertText: (text: string) => void
 }
@@ -46,6 +58,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   projectTitle: '',
   chapters: [],
   activeChapterId: '',
+  storyBible: null,
+  activeDocumentType: 'chapter',
+  activeStoryFile: null,
   isDirty: false,
   lastSavedAt: null,
 
@@ -53,9 +68,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     // Setup Live File Sync listener once
     if (!isFileSyncSubscribed && window.api?.onProjectFileChanged) {
       window.api.onProjectFileChanged((payload) => {
-        const { projectPath, filename, content } = payload
+        const { projectPath, filename, content, filePath } = payload
         const state = get()
         if (!state.projectPath || state.projectPath !== projectPath) return
+
+        if (filePath.includes('story/')) {
+          // Story Bible file changed
+          if (state.activeStoryFile && state.activeStoryFile.filename === filename) {
+            set({
+              activeStoryFile: {
+                ...state.activeStoryFile,
+                content: content ?? state.activeStoryFile.content,
+                updatedAt: Date.now()
+              },
+              isDirty: false,
+              lastSavedAt: Date.now()
+            })
+          }
+          state.loadProjectByPath(projectPath)
+          return
+        }
 
         const existing = state.chapters.find((ch) => ch.filename === filename)
         if (existing) {
@@ -115,6 +147,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           projectTitle: data.title,
           chapters: data.chapters,
           activeChapterId: data.activeChapterId || data.chapters[0].id,
+          storyBible: data.storyBible || null,
           isDirty: false,
           lastSavedAt: Date.now()
         })
@@ -135,6 +168,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       projectTitle: '',
       chapters: [],
       activeChapterId: '',
+      storyBible: null,
+      activeDocumentType: 'chapter',
+      activeStoryFile: null,
       isDirty: false,
       lastSavedAt: null
     })
@@ -149,16 +185,38 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   selectChapter: (id: string) => {
-    get().saveActiveChapter()
-    set({ activeChapterId: id, isDirty: false })
+    get().saveActiveDocument()
+    set({
+      activeDocumentType: 'chapter',
+      activeChapterId: id,
+      activeStoryFile: null,
+      isDirty: false
+    })
+  },
+
+  selectStoryFile: (file: StoryBibleFile) => {
+    get().saveActiveDocument()
+    set({
+      activeDocumentType: 'story',
+      activeStoryFile: file,
+      isDirty: false
+    })
   },
 
   updateContent: (content: string) => {
-    const { chapters, activeChapterId } = get()
-    const updated = chapters.map((ch) =>
-      ch.id === activeChapterId ? { ...ch, content, updatedAt: Date.now() } : ch
-    )
-    set({ chapters: updated, isDirty: true })
+    const { activeDocumentType, chapters, activeChapterId, activeStoryFile } = get()
+
+    if (activeDocumentType === 'chapter') {
+      const updated = chapters.map((ch) =>
+        ch.id === activeChapterId ? { ...ch, content, updatedAt: Date.now() } : ch
+      )
+      set({ chapters: updated, isDirty: true })
+    } else if (activeStoryFile) {
+      set({
+        activeStoryFile: { ...activeStoryFile, content, updatedAt: Date.now() },
+        isDirty: true
+      })
+    }
   },
 
   updateChapterTitle: async (id: string, title: string) => {
@@ -189,10 +247,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({ chapters: updated, isDirty: true })
   },
 
-  addChapter: async (customTitle?: string) => {
+  addChapter: async (customTitle?: string, volume?: string) => {
     const { chapters, projectPath } = get()
     if (!projectPath) {
-      // Prompt user to create or open a project first
       await get().createProject()
       return
     }
@@ -209,6 +266,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       title,
       content: '',
       filename,
+      volume,
       updatedAt: Date.now()
     }
 
@@ -223,7 +281,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     set({
       chapters: [...chapters, newChapter],
+      activeDocumentType: 'chapter',
       activeChapterId: newId,
+      activeStoryFile: null,
       isDirty: false,
       lastSavedAt: Date.now()
     })
@@ -246,7 +306,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     const remaining = chapters.filter((ch) => ch.id !== id)
 
-    // If all chapters were deleted, reset safely to a fresh blank "第一章"
     if (remaining.length === 0) {
       const resetChapter: Chapter = {
         id: `ch-${Date.now()}`,
@@ -265,14 +324,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }
       set({
         chapters: [resetChapter],
+        activeDocumentType: 'chapter',
         activeChapterId: resetChapter.id,
+        activeStoryFile: null,
         isDirty: false,
         lastSavedAt: Date.now()
       })
       return
     }
 
-    // Smoothly transition active chapter to adjacent chapter
     let nextActiveId = activeChapterId
     if (activeChapterId === id) {
       const deletedIndex = chapters.findIndex((ch) => ch.id === id)
@@ -287,47 +347,132 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     })
   },
 
-  applyTypography: () => {
-    const { chapters, activeChapterId } = get()
-    const active = chapters.find((ch) => ch.id === activeChapterId)
-    if (!active) return
+  createStoryFile: async (type: 'outline' | 'character', title?: string) => {
+    const { projectPath } = get()
+    if (!projectPath) return
 
-    const formatted = formatChineseManuscript(active.content)
-    const updated = chapters.map((ch) =>
-      ch.id === activeChapterId ? { ...ch, content: formatted, updatedAt: Date.now() } : ch
-    )
-    set({ chapters: updated, isDirty: true })
+    const defaultTitle = type === 'outline' ? '分卷大纲' : '新人物档案'
+    const finalTitle = title || defaultTitle
+
+    try {
+      const newFile = await window.api.createStoryFile({
+        projectPath,
+        type,
+        title: finalTitle
+      })
+
+      const storyBible = get().storyBible
+      if (storyBible) {
+        if (type === 'outline') {
+          storyBible.outlines = [...storyBible.outlines, newFile]
+        } else {
+          storyBible.characters = [...storyBible.characters, newFile]
+        }
+        set({ storyBible: { ...storyBible } })
+      }
+
+      get().selectStoryFile(newFile)
+    } catch {
+      // ignore
+    }
   },
 
-  saveActiveChapter: async () => {
-    const { chapters, activeChapterId, projectPath } = get()
-    const active = chapters.find((ch) => ch.id === activeChapterId)
-    if (!active) return
+  deleteStoryFile: async (relativePath: string) => {
+    const { projectPath, storyBible, activeStoryFile } = get()
+    if (!projectPath) return
 
-    if (projectPath && active.filename) {
-      try {
-        await window.api.saveProjectChapter({
-          projectPath,
-          chapter: active
-        })
-      } catch {
-        // ignore
+    try {
+      await window.api.deleteStoryFile({ projectPath, relativePath })
+
+      if (storyBible) {
+        const outlines = storyBible.outlines.filter((o) => o.relativePath !== relativePath)
+        const characters = storyBible.characters.filter((c) => c.relativePath !== relativePath)
+        set({ storyBible: { ...storyBible, outlines, characters } })
       }
+
+      if (activeStoryFile?.relativePath === relativePath) {
+        // Fall back to first chapter
+        const chapters = get().chapters
+        if (chapters.length > 0) {
+          get().selectChapter(chapters[0].id)
+        }
+      }
+    } catch {
+      // ignore
+    }
+  },
+
+  applyTypography: () => {
+    const { activeDocumentType, chapters, activeChapterId, activeStoryFile } = get()
+
+    if (activeDocumentType === 'chapter') {
+      const active = chapters.find((ch) => ch.id === activeChapterId)
+      if (!active) return
+      const formatted = formatChineseManuscript(active.content)
+      const updated = chapters.map((ch) =>
+        ch.id === activeChapterId ? { ...ch, content: formatted, updatedAt: Date.now() } : ch
+      )
+      set({ chapters: updated, isDirty: true })
+    } else if (activeStoryFile) {
+      const formatted = formatChineseManuscript(activeStoryFile.content)
+      set({
+        activeStoryFile: { ...activeStoryFile, content: formatted, updatedAt: Date.now() },
+        isDirty: true
+      })
+    }
+  },
+
+  saveActiveDocument: async () => {
+    const { activeDocumentType, chapters, activeChapterId, activeStoryFile, projectPath } = get()
+    if (!projectPath) return
+
+    if (activeDocumentType === 'chapter') {
+      const active = chapters.find((ch) => ch.id === activeChapterId)
+      if (active && active.filename) {
+        try {
+          await window.api.saveProjectChapter({
+            projectPath,
+            chapter: active
+          })
+        } catch {}
+      }
+    } else if (activeStoryFile) {
+      try {
+        await window.api.saveStoryFile({
+          projectPath,
+          relativePath: activeStoryFile.relativePath,
+          content: activeStoryFile.content
+        })
+      } catch {}
     }
 
     set({ isDirty: false, lastSavedAt: Date.now() })
   },
 
+  saveActiveChapter: async () => {
+    return get().saveActiveDocument()
+  },
+
   insertText: (text: string) => {
-    const { chapters, activeChapterId } = get()
-    const active = chapters.find((ch) => ch.id === activeChapterId)
-    if (!active) return
+    const { activeDocumentType, chapters, activeChapterId, activeStoryFile } = get()
     const cleanText = text.trim()
-    const newContent = active.content ? `${active.content}\n\n${cleanText}` : cleanText
-    const updated = chapters.map((ch) =>
-      ch.id === activeChapterId ? { ...ch, content: newContent, updatedAt: Date.now() } : ch
-    )
-    set({ chapters: updated, isDirty: true })
-    get().saveActiveChapter()
+
+    if (activeDocumentType === 'chapter') {
+      const active = chapters.find((ch) => ch.id === activeChapterId)
+      if (!active) return
+      const newContent = active.content ? `${active.content}\n\n${cleanText}` : cleanText
+      const updated = chapters.map((ch) =>
+        ch.id === activeChapterId ? { ...ch, content: newContent, updatedAt: Date.now() } : ch
+      )
+      set({ chapters: updated, isDirty: true })
+    } else if (activeStoryFile) {
+      const newContent = activeStoryFile.content ? `${activeStoryFile.content}\n\n${cleanText}` : cleanText
+      set({
+        activeStoryFile: { ...activeStoryFile, content: newContent, updatedAt: Date.now() },
+        isDirty: true
+      })
+    }
+
+    get().saveActiveDocument()
   }
 }))

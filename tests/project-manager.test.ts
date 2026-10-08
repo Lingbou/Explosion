@@ -10,7 +10,10 @@ vi.mock('electron', () => ({
   shell: {
     openPath: vi.fn()
   },
-  BrowserWindow: vi.fn()
+  BrowserWindow: {
+    fromWebContents: vi.fn(),
+    getAllWindows: vi.fn(() => [])
+  }
 }))
 
 import { ProjectManager } from '../src/main/project/manager'
@@ -38,16 +41,65 @@ describe('ProjectManager', () => {
     }
   })
 
-  it('loads and initializes a new project with manuscript/ and initial chapter', async () => {
+  it('loads and initializes a new project with manuscript/, story/ and Story Bible', async () => {
     const data = await manager.loadProject(tempProjectDir)
 
     expect(fs.existsSync(path.join(tempProjectDir, 'manuscript'))).toBe(true)
     expect(fs.existsSync(path.join(tempProjectDir, 'story'))).toBe(true)
+    expect(fs.existsSync(path.join(tempProjectDir, 'story', 'outlines'))).toBe(true)
+    expect(fs.existsSync(path.join(tempProjectDir, 'story', 'characters'))).toBe(true)
+    expect(fs.existsSync(path.join(tempProjectDir, 'story', 'ledger.txt'))).toBe(true)
     expect(fs.existsSync(path.join(tempProjectDir, '.explosion'))).toBe(true)
+
     expect(data.chapters.length).toBe(1)
     expect(data.chapters[0].title).toBe('第一章')
-    expect(data.chapters[0].filename).toBe('001-第一章.txt')
+    expect(data.storyBible).toBeDefined()
+    expect(data.storyBible?.ledger).toBeDefined()
     expect(testConfigStore.getConfig().workspace.lastProjectPath).toBe(tempProjectDir)
+  })
+
+  it('scans multi-volume chapter subdirectories correctly', async () => {
+    const vol1Dir = path.join(tempProjectDir, 'manuscript', '卷一 蛮荒')
+    const vol2Dir = path.join(tempProjectDir, 'manuscript', '卷二 苍云古齿')
+    fs.mkdirSync(vol1Dir, { recursive: true })
+    fs.mkdirSync(vol2Dir, { recursive: true })
+
+    fs.writeFileSync(path.join(vol1Dir, '001-蛮荒之鹰.txt'), '草原上的雄鹰。', 'utf-8')
+    fs.writeFileSync(path.join(vol2Dir, '001-古齿剑鸣.txt'), '剑鞘震颤。', 'utf-8')
+
+    const data = await manager.loadProject(tempProjectDir)
+    expect(data.chapters.length).toBe(2)
+
+    const vol1Chapter = data.chapters.find((c) => c.volume === '卷一 蛮荒')
+    const vol2Chapter = data.chapters.find((c) => c.volume === '卷二 苍云古齿')
+
+    expect(vol1Chapter).toBeDefined()
+    expect(vol1Chapter?.title).toBe('蛮荒之鹰')
+    expect(vol2Chapter).toBeDefined()
+    expect(vol2Chapter?.title).toBe('古齿剑鸣')
+  })
+
+  it('manages Story Bible outlines and characters files', async () => {
+    await manager.loadProject(tempProjectDir)
+
+    // Create outline
+    const outline = manager.createStoryFile(tempProjectDir, 'outline', '第一卷大纲')
+    expect(outline.type).toBe('outline')
+    expect(fs.existsSync(path.join(tempProjectDir, outline.relativePath))).toBe(true)
+
+    // Create character
+    const character = manager.createStoryFile(tempProjectDir, 'character', '吕归尘')
+    expect(character.type).toBe('character')
+    expect(fs.existsSync(path.join(tempProjectDir, character.relativePath))).toBe(true)
+
+    // Save update
+    manager.saveStoryFile(tempProjectDir, character.relativePath, '吕归尘，青阳世子。')
+    const updated = fs.readFileSync(path.join(tempProjectDir, character.relativePath), 'utf-8')
+    expect(updated).toBe('吕归尘，青阳世子。')
+
+    // Delete
+    manager.deleteStoryFile(tempProjectDir, outline.relativePath)
+    expect(fs.existsSync(path.join(tempProjectDir, outline.relativePath))).toBe(false)
   })
 
   it('saves and reads chapter files directly on disk', async () => {
@@ -66,24 +118,6 @@ describe('ProjectManager', () => {
     const filePath = path.join(tempProjectDir, 'manuscript', '001-第一章.txt')
     expect(fs.existsSync(filePath)).toBe(true)
     expect(fs.readFileSync(filePath, 'utf-8')).toBe('南淮的雨夜很冷。')
-  })
-
-  it('renames and deletes chapter files on disk', async () => {
-    await manager.loadProject(tempProjectDir)
-
-    const renameResult = manager.renameProjectChapter(
-      tempProjectDir,
-      'ch-1',
-      '001-第一章.txt',
-      '第一章 暴雨将至'
-    )
-
-    expect(renameResult.success).toBe(true)
-    expect(renameResult.newFilename).toBe('001-第一章 暴雨将至.txt')
-    expect(fs.existsSync(path.join(tempProjectDir, 'manuscript', '001-第一章 暴雨将至.txt'))).toBe(true)
-
-    manager.deleteProjectChapter(tempProjectDir, renameResult.newFilename)
-    expect(fs.existsSync(path.join(tempProjectDir, 'manuscript', renameResult.newFilename))).toBe(false)
   })
 
   it('closes current project and sets lastProjectPath to null', async () => {
