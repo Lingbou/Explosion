@@ -74,11 +74,14 @@ export function resolveToolCallIntent(rawName: string, rawArguments: any): {
     'edit_file',
     'list_dir',
     'web_search',
-    'web_extract'
+    'web_extract',
+    'search_library'
   ]
 
   if (!KNOWN_TOOLS.includes(name)) {
-    if (args.command) {
+        if (args.query && (args.book_name || name.includes('library') || name.includes('search_lib') || name.includes('book'))) {
+      name = 'search_library'
+    } else if (args.command) {
       name = 'exec_command'
     } else if (args.old_str !== undefined && args.new_str !== undefined) {
       name = 'edit_file'
@@ -153,11 +156,15 @@ export class AgentRunner {
     const config = this.getConfigStore().getConfig()
     const maxTurns = this.options?.maxTurns || 15
 
+    const rawMentions = taskOptions.userPrompt.match(/@[^\s,，。！？]+/g) || []
+    const referencedBooks = rawMentions.map((m) => m.slice(1).trim()).filter(Boolean)
+
     const systemPrompt = buildAgentSystemPrompt({
       projectPath: taskOptions.projectPath,
       activeChapterFilename: taskOptions.activeChapterFilename,
       manuscriptContext: taskOptions.manuscriptContext,
-      libraryPath: config.workspace.libraryPath
+      libraryPath: config.workspace.libraryPath,
+      referencedBooks
     })
 
     const messages: LLMMessage[] = [

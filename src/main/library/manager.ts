@@ -62,25 +62,51 @@ export class LibraryManager {
 
   public listLibraryFiles(): LibraryBook[] {
     const libPath = this.getLibraryPath()
-    const files = fs.readdirSync(libPath)
+    if (!fs.existsSync(libPath)) return []
 
+    const entries = fs.readdirSync(libPath, { withFileTypes: true })
     const books: LibraryBook[] = []
-    for (const file of files) {
-      if (file.startsWith('.')) continue
-      const fullPath = path.join(libPath, file)
-      try {
-        const stat = fs.statSync(fullPath)
-        if (stat.isFile() && file.endsWith('.txt')) {
+
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue
+
+      if (entry.isDirectory()) {
+        const bookName = entry.name
+        const bookDir = path.join(libPath, bookName)
+        try {
+          const files = fs.readdirSync(bookDir)
+          for (const file of files) {
+            if (file.startsWith('.') || !file.endsWith('.txt')) continue
+            const fullPath = path.join(bookDir, file)
+            const stat = fs.statSync(fullPath)
+            books.push({
+              filename: file,
+              path: fullPath,
+              relativePath: path.join(bookName, file),
+              bookName,
+              size: stat.size,
+              updatedAt: stat.mtimeMs,
+              isProcessing: this.processingFilenames.has(file) || this.processingFilenames.has(bookName)
+            })
+          }
+        } catch {
+          // ignore
+        }
+      } else if (entry.isFile() && entry.name.endsWith('.txt')) {
+        const fullPath = path.join(libPath, entry.name)
+        try {
+          const stat = fs.statSync(fullPath)
           books.push({
-            filename: file,
+            filename: entry.name,
             path: fullPath,
+            relativePath: entry.name,
             size: stat.size,
             updatedAt: stat.mtimeMs,
-            isProcessing: this.processingFilenames.has(file)
+            isProcessing: this.processingFilenames.has(entry.name)
           })
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
       }
     }
 
@@ -127,10 +153,13 @@ export class LibraryManager {
 
   public async processLibraryFile(filename: string): Promise<boolean> {
     const libPath = this.getLibraryPath()
-    const filePath = path.join(libPath, filename)
+    let filePath = path.join(libPath, filename)
 
     if (!fs.existsSync(filePath)) {
-      return false
+      const all = this.listLibraryFiles()
+      const match = all.find((b) => b.filename === filename || b.relativePath === filename)
+      if (match) filePath = match.path
+      else return false
     }
 
     this.processingFilenames.add(filename)
@@ -161,21 +190,6 @@ export class LibraryManager {
 
     return new Promise<boolean>((resolve) => {
       exec(`python3 "${scriptPath}" "${filePath}" --output-dir "${libPath}"`, (_err) => {
-        // Upon splitting into volumes, ensure the original monolithic large file is removed
-        if (fs.existsSync(filePath)) {
-          try {
-            const currentFiles = fs.readdirSync(libPath)
-            const baseName = path.basename(filename, '.txt')
-            const hasSplitVolumes = currentFiles.some(
-              (f) => f !== filename && f.includes(baseName) && (f.includes('卷') || f.includes('序言'))
-            )
-            if (hasSplitVolumes) {
-              fs.unlinkSync(filePath)
-            }
-          } catch {
-            // ignore
-          }
-        }
         this.processingFilenames.delete(filename)
         this.broadcastProcessingStatus()
         this.broadcastBooksUpdated()
@@ -192,10 +206,16 @@ export class LibraryManager {
 
   public readLibraryFileContent(filename: string): LibraryBookContent {
     const libPath = this.getLibraryPath()
-    const filePath = path.join(libPath, filename)
+    let filePath = path.join(libPath, filename)
 
     if (!fs.existsSync(filePath)) {
-      throw new Error(`藏书文件不存在: ${filename}`)
+      const all = this.listLibraryFiles()
+      const found = all.find((b) => b.filename === filename || b.relativePath === filename)
+      if (found) {
+        filePath = found.path
+      } else {
+        throw new Error(`藏书文件不存在: ${filename}`)
+      }
     }
 
     const buf = fs.readFileSync(filePath)
@@ -214,7 +234,7 @@ export class LibraryManager {
     }
 
     return {
-      filename,
+      filename: path.basename(filePath),
       content,
       size: buf.length
     }
@@ -222,13 +242,40 @@ export class LibraryManager {
 
   public deleteLibraryFile(filename: string): boolean {
     const libPath = this.getLibraryPath()
-    const filePath = path.join(libPath, filename)
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath)
-      this.broadcastBooksUpdated()
-      return true
+    let filePath = path.join(libPath, filename)
+
+    if (!fs.existsSync(filePath)) {
+      const all = this.listLibraryFiles()
+      const found = all.find((b) => b.filename === filename || b.relativePath === filename)
+      if (found) {
+        filePath = found.path
+      } else {
+        return false
+      }
     }
-    return false
+
+    fs.unlinkSync(filePath)
+
+    // Clean up empty folder and its .cache if needed
+    const parentDir = path.dirname(filePath)
+    if (parentDir !== libPath && fs.existsSync(parentDir)) {
+      const remainingTxt = fs.readdirSync(parentDir).filter((f) => f.endsWith('.txt') && !f.startsWith('.'))
+      if (remainingTxt.length === 0) {
+        try {
+          const symlink = path.join(parentDir, '.cache')
+          try {
+            const stat = fs.lstatSync(symlink)
+            if (stat.isSymbolicLink() || stat.isFile()) {
+              fs.unlinkSync(symlink)
+            }
+          } catch {}
+          fs.rmdirSync(parentDir)
+        } catch {}
+      }
+    }
+
+    this.broadcastBooksUpdated()
+    return true
   }
 }
 

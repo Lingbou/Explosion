@@ -17,7 +17,7 @@ describe('organize_library.py Book Splitting Script', () => {
     }
   })
 
-  it('splits multi-volume book into individual clean UTF-8 volumes and removes original large file', () => {
+  it('splits multi-volume book into structured book directory with volumes, .cache symlink and removes original large file', () => {
     const scriptPath = path.resolve(__dirname, '../src/main/library/organize_library.py')
     const bookFile = path.join(tempSandboxDir, '《大荒记》（实体版全本）作者：测试.txt')
 
@@ -52,17 +52,24 @@ describe('organize_library.py Book Splitting Script', () => {
 
     expect(output).toContain('成功物理拆解')
 
-    const files = fs.readdirSync(outDir)
+    const bookDir = path.join(outDir, '大荒记')
+    expect(fs.existsSync(bookDir)).toBe(true)
+
+    const files = fs.readdirSync(bookDir)
     expect(files.some((f) => f.includes('卷一') && f.includes('蛮荒之境'))).toBe(true)
     expect(files.some((f) => f.includes('卷二') && f.includes('苍云古齿'))).toBe(true)
 
     // Check volume 1 content
     const vol1File = files.find((f) => f.includes('卷一'))
     expect(vol1File).toBeDefined()
-    const vol1Content = fs.readFileSync(path.join(outDir, vol1File!), 'utf-8')
+    const vol1Content = fs.readFileSync(path.join(bookDir, vol1File!), 'utf-8')
     expect(vol1Content).toContain('卷一 蛮荒之境')
     expect(vol1Content).toContain('这是卷一的第 60 行')
     expect(vol1Content).not.toContain('卷二 苍云古齿')
+
+    // Check .cache symlink exists
+    const symlinkPath = path.join(bookDir, '.cache')
+    expect(fs.existsSync(symlinkPath)).toBe(true)
 
     // Original monolithic file must be automatically removed!
     expect(fs.existsSync(bookFile)).toBe(false)

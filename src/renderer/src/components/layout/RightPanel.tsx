@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import {
   Settings,
   Send,
@@ -22,6 +22,7 @@ import {
 import { useAgentStore, AgentTraceStep } from '../../store/agentStore'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useConfigStore } from '../../store/configStore'
+import { useLibraryStore } from '../../store/libraryStore'
 import { stripMarkdownMarks } from '../../lib/typography'
 
 interface RightPanelProps {
@@ -36,6 +37,7 @@ function getToolMeta(toolName: string) {
     if (normalized.includes('command')) normalized = 'exec_command'
     else if (normalized.includes('old_str')) normalized = 'edit_file'
     else if (normalized.includes('content') && normalized.includes('path')) normalized = 'write_file'
+    else if (normalized.includes('query') && normalized.includes('book')) normalized = 'search_library'
     else if (normalized.includes('query')) normalized = 'web_search'
     else if (normalized.includes('url')) normalized = 'web_extract'
     else if (normalized.includes('path')) normalized = 'read_file'
@@ -48,6 +50,12 @@ function getToolMeta(toolName: string) {
   if (normalized.startsWith('default_api:')) normalized = normalized.slice(12)
 
   switch (normalized) {
+    case 'search_library':
+      return {
+        label: '原著自然段全文检索',
+        color: 'text-amber-800 bg-amber-50 border-amber-200',
+        icon: Search
+      }
     case 'exec_command':
       return {
         label: '执行终端命令',
@@ -100,6 +108,9 @@ function getToolMeta(toolName: string) {
 }
 
 function formatTraceArgs(toolName: string, args: Record<string, unknown>): string {
+  if (toolName === 'search_library' && args.query) {
+    return args.book_name ? `《${args.book_name}》: "${String(args.query)}"` : `"${String(args.query)}"`
+  }
   if (args && args.path) {
     return String(args.path)
   }
@@ -213,17 +224,27 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
 
   const { projectPath, chapters, activeChapterId } = useWorkspaceStore()
   const { config, isConfigured, setIsSettingsOpen } = useConfigStore()
+  const { books, fetchBooks } = useLibraryStore()
 
   const [inputPrompt, setInputPrompt] = useState('')
   const [showThinkingMap, setShowThinkingMap] = useState<Record<string, boolean>>({})
   const [isSessionDropdownOpen, setIsSessionDropdownOpen] = useState(false)
 
+  // @ Mention Popover states
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const activeChapter = chapters.find((ch) => ch.id === activeChapterId)
 
   const currentSession = sessions.find((s) => s.id === activeSessionId) || sessions[0]
   const messages = currentSession?.messages || []
+
+  useEffect(() => {
+    fetchBooks()
+  }, [fetchBooks])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -244,11 +265,117 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
     }
   }, [isSessionDropdownOpen])
 
+  // Candidate items for @ Mention
+  const mentionCandidates = useMemo(() => {
+    if (mentionQuery === null) return []
+    const items: Array<{ id: string; label: string; insertText: string; type: 'book' | 'volume' }> = []
+    const bookNames = new Set<string>()
+
+    for (const b of books) {
+      if (b.bookName && !bookNames.has(b.bookName)) {
+        bookNames.add(b.bookName)
+        items.push({
+          id: `book-${b.bookName}`,
+          label: `《${b.bookName}》 (整本藏书)`,
+          insertText: `@${b.bookName} `,
+          type: 'book'
+        })
+      }
+
+      const label = b.bookName ? `《${b.bookName}》· ${b.filename}` : b.filename
+      const insert = b.bookName ? `@${b.bookName}/${b.filename} ` : `@${b.filename} `
+      items.push({
+        id: `vol-${b.path}`,
+        label,
+        insertText: insert,
+        type: 'volume'
+      })
+    }
+
+    const q = mentionQuery.toLowerCase()
+    return items.filter(
+      (item) => item.label.toLowerCase().includes(q) || item.insertText.toLowerCase().includes(q)
+    )
+  }, [mentionQuery, books])
+
+  const insertMention = (insertText: string) => {
+    if (!textareaRef.current) return
+    const textarea = textareaRef.current
+    const val = inputPrompt
+    const cursorPos = textarea.selectionStart || val.length
+    const textBeforeCursor = val.slice(0, cursorPos)
+    const textAfterCursor = val.slice(cursorPos)
+
+    const match = textBeforeCursor.match(/@([^\s@]*)$/)
+    if (match) {
+      const atStart = textBeforeCursor.length - match[0].length
+      const newVal = textBeforeCursor.slice(0, atStart) + insertText + textAfterCursor
+      setInputPrompt(newVal)
+      setMentionQuery(null)
+
+      setTimeout(() => {
+        textarea.focus()
+        const newCursor = atStart + insertText.length
+        textarea.setSelectionRange(newCursor, newCursor)
+      }, 10)
+    }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value
+    setInputPrompt(val)
+
+    const cursorPos = e.target.selectionStart || val.length
+    const textBeforeCursor = val.slice(0, cursorPos)
+    const match = textBeforeCursor.match(/@([^\s@]*)$/)
+
+    if (match) {
+      setMentionQuery(match[1])
+      setMentionSelectedIndex(0)
+    } else {
+      setMentionQuery(null)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionQuery !== null && mentionCandidates.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setMentionSelectedIndex((prev) => (prev + 1) % mentionCandidates.length)
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setMentionSelectedIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length)
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        const target = mentionCandidates[mentionSelectedIndex] || mentionCandidates[0]
+        if (target) {
+          insertMention(target.insertText)
+        }
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setMentionQuery(null)
+        return
+      }
+    }
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
   const handleSend = () => {
     const textToSend = inputPrompt.trim()
     if (!textToSend || isRunning) return
 
     setInputPrompt('')
+    setMentionQuery(null)
     sendTask(textToSend, {
       projectPath,
       activeChapterFilename: activeChapter?.filename,
@@ -341,10 +468,10 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
             <span>新建</span>
           </button>
 
-          {/* Active Model Pill */}
+          {/* Active Model Pill (Full model name, zero premature truncation) */}
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono border border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100 hover:border-stone-300 transition-all shrink-0 whitespace-nowrap"
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono border border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100 hover:border-stone-300 transition-all shrink-0 whitespace-nowrap"
             title="点击配置主力模型与服务商"
           >
             <span
@@ -352,7 +479,9 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
                 isConfigured ? 'bg-emerald-500' : 'bg-amber-500'
               }`}
             />
-            <span className="whitespace-nowrap">{isConfigured ? config.provider.activeModel || '未选模型' : '未配置'}</span>
+            <span className="whitespace-nowrap">
+              {isConfigured ? config.provider.activeModel || '未选模型' : '未配置'}
+            </span>
           </button>
 
           {/* Global Settings */}
@@ -380,7 +509,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
       <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 scrollbar-thin">
         {messages.length === 0 && !isRunning && (
           <div className="h-full flex items-center justify-center text-center p-6 text-stone-400/80 text-xs select-none">
-            在此输入指令或向助手提问...
+            在此输入指令或向助手提问，输入 @ 可引用参考藏书...
           </div>
         )}
 
@@ -481,19 +610,42 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area (Clean & Pure) */}
-      <div className="p-3 border-t border-stone-200 bg-white shrink-0">
+      {/* Input Area (Clean & Pure with @Mention Book Popover) */}
+      <div className="p-3 border-t border-stone-200 bg-white shrink-0 relative">
+        {/* @ Mention Popover Menu */}
+        {mentionQuery !== null && mentionCandidates.length > 0 && (
+          <div className="absolute bottom-full mb-1.5 left-3 right-3 max-h-48 bg-white border border-stone-200 rounded-lg shadow-xl overflow-hidden flex flex-col z-50 text-xs font-sans animate-in fade-in duration-100">
+            <div className="px-3 py-1.5 border-b border-stone-100 text-[10px] text-stone-400 font-semibold uppercase tracking-wider flex items-center justify-between">
+              <span>引用参考藏书 (@Mention)</span>
+              <span className="font-mono text-[9px]">↑↓ 选择 · 回车插入</span>
+            </div>
+            <div className="overflow-y-auto p-1 space-y-0.5 scrollbar-thin">
+              {mentionCandidates.map((cand, idx) => {
+                const isSelected = idx === mentionSelectedIndex
+                return (
+                  <div
+                    key={cand.id}
+                    onClick={() => insertMention(cand.insertText)}
+                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${
+                      isSelected ? 'bg-stone-100 text-stone-900 font-medium' : 'text-stone-600 hover:bg-stone-50'
+                    }`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span className="truncate text-xs">{cand.label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="relative flex items-end bg-stone-50 border border-stone-200 rounded-lg p-1.5 focus-within:border-stone-400 focus-within:bg-white transition-all">
           <textarea
+            ref={textareaRef}
             value={inputPrompt}
-            onChange={(e) => setInputPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleSend()
-              }
-            }}
-            placeholder="输入写作指令或问题 (Enter 发送)..."
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder="输入指令，输入 @ 可引用参考藏书 (Enter 发送)..."
             rows={2}
             className="w-full bg-transparent resize-none border-none focus:outline-none text-xs text-stone-900 placeholder-stone-400 px-2 py-1 leading-relaxed max-h-24 scrollbar-thin"
           />
