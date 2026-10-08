@@ -37,6 +37,7 @@ interface WorkspaceState {
   selectStoryFile: (file: StoryBibleFile) => void
   createStoryFile: (type: 'outline' | 'character', title?: string) => Promise<void>
   deleteStoryFile: (relativePath: string) => Promise<void>
+  renameStoryFile: (relativePath: string, newTitle: string) => Promise<void>
 
   // Common Actions
   applyTypography: () => void
@@ -395,6 +396,52 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         const chapters = get().chapters
         if (chapters.length > 0) {
           get().selectChapter(chapters[0].id)
+        }
+      }
+    } catch {
+      // ignore
+    }
+  },
+
+  renameStoryFile: async (relativePath: string, newTitle: string) => {
+    const { projectPath, storyBible, activeStoryFile } = get()
+    if (!projectPath || !newTitle.trim()) return
+
+    try {
+      const res = await window.api.renameStoryFile({
+        projectPath,
+        relativePath,
+        newTitle: newTitle.trim()
+      })
+
+      if (res.success && storyBible) {
+        const updateList = (list: StoryBibleFile[]) =>
+          list.map((item) =>
+            item.relativePath === relativePath
+              ? {
+                  ...item,
+                  title: newTitle.trim(),
+                  filename: res.newFilename,
+                  relativePath: res.newRelativePath,
+                  updatedAt: Date.now()
+                }
+              : item
+          )
+
+        const outlines = updateList(storyBible.outlines)
+        const characters = updateList(storyBible.characters)
+        set({ storyBible: { ...storyBible, outlines, characters } })
+
+        if (activeStoryFile?.relativePath === relativePath) {
+          set({
+            activeStoryFile: {
+              ...activeStoryFile,
+              title: newTitle.trim(),
+              filename: res.newFilename,
+              relativePath: res.newRelativePath,
+              updatedAt: Date.now()
+            }
+          })
         }
       }
     } catch {
