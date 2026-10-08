@@ -54,8 +54,26 @@ describe('ProjectManager', () => {
     expect(data.chapters.length).toBe(1)
     expect(data.chapters[0].title).toBe('第一章')
     expect(data.storyBible).toBeDefined()
-    expect(data.storyBible?.ledger).toBeDefined(); expect(data.storyBible?.ledger?.content).toBe('')
+    expect(data.storyBible?.ledger).toBeDefined()
+    expect(data.storyBible?.ledger?.content).toBe('')
     expect(testConfigStore.getConfig().workspace.lastProjectPath).toBe(tempProjectDir)
+  })
+
+  it('automatically purges any legacy mock boilerplate text from existing project files', async () => {
+    const storyDir = path.join(tempProjectDir, 'story')
+    fs.mkdirSync(storyDir, { recursive: true })
+    const threadsPath = path.join(storyDir, 'threads.txt')
+    fs.writeFileSync(
+      threadsPath,
+      '【本作伏笔账本】\n记录全书关键暗线、未解之谜与回收状态。\n\n[伏笔 #1] 主角的隐秘身世\n- 状态：未解开\n- 触发线索：幼年留下的古老指环\n',
+      'utf-8'
+    )
+
+    const data = await manager.loadProject(tempProjectDir)
+    expect(data.storyBible?.ledger?.content).toBe('')
+    const onDisk = fs.readFileSync(threadsPath, 'utf-8')
+    expect(onDisk).toBe('')
+    expect(onDisk).not.toContain('古老指环')
   })
 
   it('scans multi-volume chapter subdirectories correctly', async () => {
@@ -79,22 +97,31 @@ describe('ProjectManager', () => {
     expect(vol2Chapter?.title).toBe('古齿剑鸣')
   })
 
-  it('manages Story Bible outlines and characters files', async () => {
+  it('manages Story Bible outlines and characters files including renaming and deletion', async () => {
     await manager.loadProject(tempProjectDir)
 
     // Create outline
     const outline = manager.createStoryFile(tempProjectDir, 'outline', '第一卷大纲')
-    expect(outline.type).toBe('outline'); expect(outline.content).toBe('')
+    expect(outline.type).toBe('outline')
+    expect(outline.content).toBe('')
     expect(fs.existsSync(path.join(tempProjectDir, outline.relativePath))).toBe(true)
 
     // Create character
     const character = manager.createStoryFile(tempProjectDir, 'character', '吕归尘')
     expect(character.type).toBe('character')
+    expect(character.content).toBe('')
     expect(fs.existsSync(path.join(tempProjectDir, character.relativePath))).toBe(true)
 
+    // Rename character
+    const renameRes = manager.renameStoryFile(tempProjectDir, character.relativePath, '世子归尘')
+    expect(renameRes.success).toBe(true)
+    expect(renameRes.newFilename).toBe('世子归尘.txt')
+    expect(fs.existsSync(path.join(tempProjectDir, renameRes.newRelativePath))).toBe(true)
+    expect(fs.existsSync(path.join(tempProjectDir, character.relativePath))).toBe(false)
+
     // Save update
-    manager.saveStoryFile(tempProjectDir, character.relativePath, '吕归尘，青阳世子。')
-    const updated = fs.readFileSync(path.join(tempProjectDir, character.relativePath), 'utf-8')
+    manager.saveStoryFile(tempProjectDir, renameRes.newRelativePath, '吕归尘，青阳世子。')
+    const updated = fs.readFileSync(path.join(tempProjectDir, renameRes.newRelativePath), 'utf-8')
     expect(updated).toBe('吕归尘，青阳世子。')
 
     // Delete

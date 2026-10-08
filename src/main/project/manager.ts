@@ -119,13 +119,30 @@ export class ProjectManager {
     const storyDir = path.join(projectPath, 'story')
     const outlinesDir = path.join(storyDir, 'outlines')
     const charactersDir = path.join(storyDir, 'characters')
-    const ledgerFile = path.join(storyDir, 'ledger.txt')
+    const threadsFile = path.join(storyDir, 'threads.txt')
+    const legacyLedgerFile = path.join(storyDir, 'ledger.txt')
 
     if (!fs.existsSync(outlinesDir)) fs.mkdirSync(outlinesDir, { recursive: true })
     if (!fs.existsSync(charactersDir)) fs.mkdirSync(charactersDir, { recursive: true })
 
     const outlines: StoryBibleFile[] = []
     const characters: StoryBibleFile[] = []
+
+    // Helper to sanitize and purge legacy mock boilerplate
+    const sanitizeStoryContent = (filePath: string, raw: string): string => {
+      if (
+        raw.includes('古老指环') ||
+        raw.includes('主角的隐秘身世') ||
+        raw.includes('本作伏笔账本') ||
+        raw.includes('【本作伏笔账本】') ||
+        raw.includes('本卷核心主线矛盾与剧情推演脉络') ||
+        raw.includes('性格特征与行事逻辑')
+      ) {
+        fs.writeFileSync(filePath, '', 'utf-8')
+        return ''
+      }
+      return raw
+    }
 
     // Read outlines
     if (fs.existsSync(outlinesDir)) {
@@ -135,13 +152,15 @@ export class ProjectManager {
           const fullPath = path.join(outlinesDir, f)
           try {
             const stat = fs.statSync(fullPath)
+            const rawContent = fs.readFileSync(fullPath, 'utf-8')
+            const content = sanitizeStoryContent(fullPath, rawContent)
             outlines.push({
               id: `outline-${f}`,
               type: 'outline',
               title: path.basename(f, '.txt'),
               filename: f,
               relativePath: path.join('story', 'outlines', f),
-              content: fs.readFileSync(fullPath, 'utf-8'),
+              content,
               updatedAt: stat.mtimeMs
             })
           } catch {
@@ -159,13 +178,15 @@ export class ProjectManager {
           const fullPath = path.join(charactersDir, f)
           try {
             const stat = fs.statSync(fullPath)
+            const rawContent = fs.readFileSync(fullPath, 'utf-8')
+            const content = sanitizeStoryContent(fullPath, rawContent)
             characters.push({
               id: `char-${f}`,
               type: 'character',
               title: path.basename(f, '.txt'),
               filename: f,
               relativePath: path.join('story', 'characters', f),
-              content: fs.readFileSync(fullPath, 'utf-8'),
+              content,
               updatedAt: stat.mtimeMs
             })
           } catch {
@@ -175,24 +196,36 @@ export class ProjectManager {
       }
     }
 
-        // Read threads (暗线)
-    const threadsFile = path.join(storyDir, 'threads.txt')
-    const legacyLedgerFile = path.join(storyDir, 'ledger.txt')
-    const targetFile = fs.existsSync(threadsFile)
+    // Read threads (暗线) - Clean migration & mock purge
+    if (fs.existsSync(legacyLedgerFile) && !fs.existsSync(threadsFile)) {
+      try {
+        fs.renameSync(legacyLedgerFile, threadsFile)
+      } catch {
+        // ignore
+      }
+    } else if (fs.existsSync(legacyLedgerFile) && fs.existsSync(threadsFile)) {
+      try {
+        fs.unlinkSync(legacyLedgerFile)
+      } catch {}
+    }
+
+    const targetThreadsFile = fs.existsSync(threadsFile)
       ? threadsFile
       : (fs.existsSync(legacyLedgerFile) ? legacyLedgerFile : threadsFile)
 
     let ledger: StoryBibleFile | null = null
-    if (fs.existsSync(targetFile)) {
+    if (fs.existsSync(targetThreadsFile)) {
       try {
-        const stat = fs.statSync(targetFile)
+        const rawContent = fs.readFileSync(targetThreadsFile, 'utf-8')
+        const content = sanitizeStoryContent(targetThreadsFile, rawContent)
+        const stat = fs.statSync(targetThreadsFile)
         ledger = {
           id: 'story-threads',
           type: 'ledger',
           title: '暗线',
-          filename: path.basename(targetFile),
-          relativePath: path.join('story', path.basename(targetFile)),
-          content: fs.readFileSync(targetFile, 'utf-8'),
+          filename: path.basename(targetThreadsFile),
+          relativePath: path.join('story', path.basename(targetThreadsFile)),
+          content,
           updatedAt: stat.mtimeMs
         }
       } catch {
@@ -249,7 +282,6 @@ export class ProjectManager {
     const chapters: ProjectChapterFile[] = []
     const rootEntries = fs.readdirSync(manuscriptDir, { withFileTypes: true })
 
-    // Check for volume subdirectories or flat txt files
     for (const entry of rootEntries) {
       if (entry.name.startsWith('.')) continue
 
@@ -310,7 +342,7 @@ export class ProjectManager {
       }
     }
 
-    // Sort root chapters numerically
+    // Sort chapters
     chapters.sort((a, b) => {
       if (a.volume && b.volume && a.volume !== b.volume) {
         return a.volume.localeCompare(b.volume, undefined, { numeric: true, sensitivity: 'base' })
@@ -319,7 +351,6 @@ export class ProjectManager {
     })
 
     if (chapters.length === 0) {
-      // Initialize with first blank chapter
       const defaultFilename = '001-第一章.txt'
       const defaultFilePath = path.join(manuscriptDir, defaultFilename)
       fs.writeFileSync(defaultFilePath, '', 'utf-8')
@@ -462,19 +493,29 @@ export class ProjectManager {
   public createStoryFile(
     projectPath: string,
     type: 'outline' | 'character',
-    title: string
+    title?: string
   ): StoryBibleFile {
     const folder = type === 'outline' ? 'outlines' : 'characters'
     const targetDir = path.join(projectPath, 'story', folder)
     fs.mkdirSync(targetDir, { recursive: true })
 
-    const safeTitle = title.replace(/[\\/:*?"<>|]/g, '_').trim() || (type === 'outline' ? '新大纲' : '新人物')
+    let safeTitle = (title || '').replace(/[\\/:*?"<>|]/g, '_').trim()
+    if (!safeTitle) {
+      const existing = fs.readdirSync(targetDir)
+      const basePrefix = type === 'outline' ? '新大纲' : '新人物'
+      let counter = 1
+      safeTitle = `${basePrefix} ${counter}`
+      while (existing.includes(`${safeTitle}.txt`)) {
+        counter++
+        safeTitle = `${basePrefix} ${counter}`
+      }
+    }
+
     const filename = `${safeTitle}.txt`
     const filePath = path.join(targetDir, filename)
 
-    const initialContent = ''
-
-    fs.writeFileSync(filePath, initialContent, 'utf-8')
+    // Strictly blank initial content (zero mock template)
+    fs.writeFileSync(filePath, '', 'utf-8')
 
     return {
       id: `${type}-${filename}`,
@@ -482,9 +523,32 @@ export class ProjectManager {
       title: safeTitle,
       filename,
       relativePath: path.join('story', folder, filename),
-      content: initialContent,
+      content: '',
       updatedAt: Date.now()
     }
+  }
+
+  public renameStoryFile(
+    projectPath: string,
+    relativePath: string,
+    newTitle: string
+  ): { success: boolean; newRelativePath: string; newFilename: string } {
+    const oldPath = path.resolve(projectPath, relativePath)
+    const folder = path.dirname(oldPath)
+    const safeTitle = newTitle.replace(/[\\/:*?"<>|]/g, '_').trim() || '未命名'
+    const newFilename = `${safeTitle}.txt`
+    const newPath = path.join(folder, newFilename)
+
+    if (fs.existsSync(oldPath)) {
+      if (oldPath !== newPath) {
+        fs.renameSync(oldPath, newPath)
+      }
+    } else {
+      fs.writeFileSync(newPath, '', 'utf-8')
+    }
+
+    const newRelativePath = path.relative(projectPath, newPath)
+    return { success: true, newRelativePath, newFilename }
   }
 
   public deleteStoryFile(projectPath: string, relativePath: string): boolean {

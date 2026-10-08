@@ -344,7 +344,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
           {/* Active Model Pill */}
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono border border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100 hover:border-stone-300 transition-all max-w-[110px] shrink-0"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono border border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100 hover:border-stone-300 transition-all shrink-0 whitespace-nowrap"
             title="点击配置主力模型与服务商"
           >
             <span
@@ -352,7 +352,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
                 isConfigured ? 'bg-emerald-500' : 'bg-amber-500'
               }`}
             />
-            <span className="truncate">{isConfigured ? config.provider.activeModel || '未选模型' : '未配置'}</span>
+            <span className="whitespace-nowrap">{isConfigured ? config.provider.activeModel || '未选模型' : '未配置'}</span>
           </button>
 
           {/* Global Settings */}

@@ -143,6 +143,7 @@ export const IPC_CHANNELS = {
   STORY_SAVE_FILE: 'story:save-file',
   STORY_CREATE_FILE: 'story:create-file',
   STORY_DELETE_FILE: 'story:delete-file',
+  STORY_RENAME_FILE: 'story:rename-file',
 
   // Material Library
   LIBRARY_LIST: 'library:list',
@@ -215,8 +216,9 @@ export interface ElectronApi {
 
   // Story Bible
   saveStoryFile: (params: { projectPath: string; relativePath: string; content: string }) => Promise<boolean>
-  createStoryFile: (params: { projectPath: string; type: 'outline' | 'character'; title: string }) => Promise<StoryBibleFile>
+  createStoryFile: (params: { projectPath: string; type: 'outline' | 'character'; title?: string }) => Promise<StoryBibleFile>
   deleteStoryFile: (params: { projectPath: string; relativePath: string }) => Promise<boolean>
+  renameStoryFile: (params: { projectPath: string; relativePath: string; newTitle: string }) => Promise<{ success: boolean; newRelativePath: string; newFilename: string }>
 
   // Library
   listLibraryFiles: () => Promise<LibraryBook[]>

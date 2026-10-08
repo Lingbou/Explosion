@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import {
   AlignLeft,
   Check,
@@ -49,15 +49,6 @@ export const EditorCenter: React.FC = () => {
 
   const stats = countTextStats(currentContent)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-
-  // Auto-resize textarea so it expands with content and NEVER displays internal scrollbars
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = `${Math.max(650, textareaRef.current.scrollHeight)}px`
-    }
-  }, [currentContent])
 
   // Auto-save debounce effect
   useEffect(() => {
@@ -228,32 +219,24 @@ export const EditorCenter: React.FC = () => {
         </div>
       </div>
 
-      {/* Editor Content Area (Spacious Typography Paper Style, Scrollbar strictly attached to rightmost edge, Wheel Scrollable) */}
-      <div
-        ref={scrollContainerRef}
-        onClick={() => textareaRef.current?.focus()}
-        className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-8 py-10 sm:px-14 lg:px-20 cursor-text flex justify-center"
-      >
-        <div className="w-full max-w-4xl flex flex-col">
-          <textarea
-            ref={textareaRef}
-            value={currentContent}
-            onChange={(e) => updateContent(e.target.value)}
-            onWheel={(e) => {
-              // Ensure mouse wheel on textarea forwards scroll to outer scroll container smoothly
-              if (scrollContainerRef.current) {
-                scrollContainerRef.current.scrollTop += e.deltaY
-              }
-            }}
-            placeholder="在此开始写作...（纯文本无污染，静候文字流淌）"
-            spellCheck={false}
-            className="w-full bg-transparent resize-none overflow-hidden border-none focus:outline-none text-stone-900 placeholder-stone-300 text-base leading-[2.1] font-serif tracking-wide"
-            style={{
-              fontFamily:
-                '"Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "SimSun", "Times New Roman", serif'
-            }}
-          />
-        </div>
+      {/* Editor Content Area (Native Standard Ultra-Smooth Scroll Architecture, Scrollbar strictly attached to rightmost edge) */}
+      <div className="flex-1 min-h-0 relative bg-[#fbfbfa]">
+        <textarea
+          ref={textareaRef}
+          value={currentContent}
+          onChange={(e) => updateContent(e.target.value)}
+          placeholder="在此开始写作...（纯文本无污染，静候文字流淌）"
+          spellCheck={false}
+          className="w-full h-full bg-transparent resize-none overflow-y-auto scrollbar-thin border-none focus:outline-none text-stone-900 placeholder-stone-300 text-base leading-[2.1] font-serif tracking-wide select-text block"
+          style={{
+            fontFamily:
+              '"Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "SimSun", "Times New Roman", serif',
+            paddingLeft: 'max(2rem, calc((100% - 56rem) / 2))',
+            paddingRight: 'max(2rem, calc((100% - 56rem) / 2))',
+            paddingTop: '2.5rem',
+            paddingBottom: '8rem'
+          }}
+        />
       </div>
 
       {/* Bottom Status Bar */}

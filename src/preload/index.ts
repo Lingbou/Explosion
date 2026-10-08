@@ -182,13 +182,20 @@ const api: ElectronApi = {
   createStoryFile: (params: {
     projectPath: string
     type: 'outline' | 'character'
-    title: string
+    title?: string
   }): Promise<StoryBibleFile> => ipcRenderer.invoke(IPC_CHANNELS.STORY_CREATE_FILE, params),
 
   deleteStoryFile: (params: {
     projectPath: string
     relativePath: string
   }): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.STORY_DELETE_FILE, params),
+
+  renameStoryFile: (params: {
+    projectPath: string
+    relativePath: string
+    newTitle: string
+  }): Promise<{ success: boolean; newRelativePath: string; newFilename: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.STORY_RENAME_FILE, params),
 
   // Library
   listLibraryFiles: (): Promise<LibraryBook[]> =>

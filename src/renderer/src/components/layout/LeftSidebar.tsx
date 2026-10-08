@@ -14,7 +14,8 @@ import {
   Bookmark,
   ChevronDown,
   ChevronRight,
-  Layers
+  Layers,
+  Folder
 } from 'lucide-react'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useLibraryStore } from '../../store/libraryStore'
@@ -41,6 +42,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
     updateChapterTitle,
     createStoryFile,
     deleteStoryFile,
+    renameStoryFile,
     openProject,
     createProject,
     closeProject
@@ -56,7 +58,14 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
 
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null)
   const [editTitleValue, setEditTitleValue] = useState('')
+
+  const [editingStoryRelPath, setEditingStoryRelPath] = useState<string | null>(null)
+  const [editStoryTitleValue, setEditStoryTitleValue] = useState('')
+
   const [isStoryBibleOpen, setIsStoryBibleOpen] = useState(true)
+  const [isOutlinesOpen, setIsOutlinesOpen] = useState(true)
+  const [isCharactersOpen, setIsCharactersOpen] = useState(true)
+
   const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false)
   const projectMenuRef = useRef<HTMLDivElement>(null)
 
@@ -92,14 +101,28 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
     setEditingChapterId(null)
   }
 
-  const handleCreateStory = (type: 'outline' | 'character', e: React.MouseEvent) => {
+  const handleStartStoryRename = (relPath: string, currentTitle: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    const promptTitle = window.prompt(
-      type === 'outline' ? '请输入大纲标题（如：第一卷主线细纲）：' : '请输入人物姓名（如：主角姓名）：'
-    )
-    if (promptTitle && promptTitle.trim()) {
-      createStoryFile(type, promptTitle.trim())
+    setEditingStoryRelPath(relPath)
+    setEditStoryTitleValue(currentTitle)
+  }
+
+  const handleFinishStoryRename = (relPath: string) => {
+    if (editStoryTitleValue.trim()) {
+      renameStoryFile(relPath, editStoryTitleValue.trim())
     }
+    setEditingStoryRelPath(null)
+  }
+
+  // Create new story file without window.prompt: instant on-the-fly creation
+  const handleCreateStory = async (type: 'outline' | 'character', e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (type === 'outline') {
+      setIsOutlinesOpen(true)
+    } else {
+      setIsCharactersOpen(true)
+    }
+    await createStoryFile(type)
   }
 
   // Group chapters by volume
@@ -392,7 +415,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
           </div>
         )}
 
-        {/* Story Bible Section (本作设定) */}
+        {/* Story Bible Section (本作设定 - 真实目录树状结构) */}
         {projectPath && (
           <div className="border-t border-stone-200/60 pt-3 space-y-1">
             <div
@@ -411,119 +434,229 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
             </div>
 
             {isStoryBibleOpen && (
-              <div className="space-y-2 pl-1">
-                {/* 1. Outlines */}
+              <div className="space-y-1.5 pl-0.5">
+                {/* 1. Outlines Folder (大纲规划) */}
                 <div className="space-y-0.5">
-                  <div className="flex items-center justify-between px-2 py-1 text-[10px] font-medium text-stone-400">
-                    <span>大纲规划 ({storyBible?.outlines?.length || 0})</span>
+                  <div
+                    onClick={() => setIsOutlinesOpen(!isOutlinesOpen)}
+                    className="flex items-center justify-between px-2 py-1.5 text-xs text-stone-600 hover:bg-stone-200/40 rounded cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-1.5 truncate">
+                      {isOutlinesOpen ? (
+                        <ChevronDown className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                      ) : (
+                        <ChevronRight className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                      )}
+                      <Folder className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span className="font-medium text-xs text-stone-800">大纲规划</span>
+                      <span className="text-[10px] text-stone-400 font-mono">
+                        ({storyBible?.outlines?.length || 0})
+                      </span>
+                    </div>
+
                     <button
                       onClick={(e) => handleCreateStory('outline', e)}
-                      className="p-0.5 hover:text-stone-800 rounded"
-                      title="新建大纲文档"
+                      className="p-0.5 hover:text-stone-900 text-stone-500 hover:bg-stone-200 rounded"
+                      title="新建大纲文件"
                     >
-                      <Plus className="w-3 h-3" />
+                      <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
 
-                  {storyBible?.outlines?.map((outline) => {
-                    const isActive =
-                      activeDocumentType === 'story' &&
-                      activeStoryFile?.relativePath === outline.relativePath
+                  {isOutlinesOpen && (
+                    <div className="pl-5 space-y-0.5">
+                      {storyBible?.outlines?.length === 0 ? (
+                        <div className="px-2 py-1 text-[11px] text-stone-400">
+                          暂无大纲，点击上方 + 新建
+                        </div>
+                      ) : (
+                        storyBible?.outlines?.map((outline) => {
+                          const isActive =
+                            activeDocumentType === 'story' &&
+                            activeStoryFile?.relativePath === outline.relativePath
+                          const isEditing = editingStoryRelPath === outline.relativePath
 
-                    return (
-                      <div
-                        key={outline.id}
-                        onClick={() => selectStoryFile(outline)}
-                        className={`group flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
-                          isActive
-                            ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/60'
-                            : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
-                        }`}
-                      >
-                        <span className="truncate flex-1 mr-1">{outline.title}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (window.confirm(`确定要删除大纲《${outline.title}》吗？`)) {
-                              deleteStoryFile(outline.relativePath)
-                            }
-                          }}
-                          className="p-0.5 text-stone-400 hover:text-rose-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="删除大纲"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )
-                  })}
+                          return (
+                            <div
+                              key={outline.id}
+                              onClick={() => selectStoryFile(outline)}
+                              onDoubleClick={(e) => handleStartStoryRename(outline.relativePath, outline.title, e)}
+                              className={`group flex items-center justify-between px-2 py-1 rounded-md text-xs cursor-pointer transition-colors ${
+                                isActive
+                                  ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/60'
+                                  : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 truncate flex-1 mr-1">
+                                <FileText className="w-3 h-3 text-amber-700 shrink-0" />
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    value={editStoryTitleValue}
+                                    onChange={(e) => setEditStoryTitleValue(e.target.value)}
+                                    onBlur={() => handleFinishStoryRename(outline.relativePath)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleFinishStoryRename(outline.relativePath)
+                                      if (e.key === 'Escape') setEditingStoryRelPath(null)
+                                    }}
+                                    autoFocus
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="bg-white border border-stone-400 rounded px-1 text-xs text-stone-900 w-full focus:outline-none"
+                                  />
+                                ) : (
+                                  <span className="truncate text-[11px]">{outline.title}</span>
+                                )}
+                              </div>
+
+                              {!isEditing && (
+                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={(e) => handleStartStoryRename(outline.relativePath, outline.title, e)}
+                                    className="p-0.5 text-stone-400 hover:text-stone-700 rounded"
+                                    title="重命名大纲"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (window.confirm(`确定要删除大纲《${outline.title}》吗？`)) {
+                                        deleteStoryFile(outline.relativePath)
+                                      }
+                                    }}
+                                    className="p-0.5 text-stone-400 hover:text-rose-600 rounded"
+                                    title="删除大纲"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* 2. Characters */}
+                {/* 2. Characters Folder (人物档案) */}
                 <div className="space-y-0.5">
-                  <div className="flex items-center justify-between px-2 py-1 text-[10px] font-medium text-stone-400">
-                    <span>人物档案 ({storyBible?.characters?.length || 0})</span>
+                  <div
+                    onClick={() => setIsCharactersOpen(!isCharactersOpen)}
+                    className="flex items-center justify-between px-2 py-1.5 text-xs text-stone-600 hover:bg-stone-200/40 rounded cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-1.5 truncate">
+                      {isCharactersOpen ? (
+                        <ChevronDown className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                      ) : (
+                        <ChevronRight className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                      )}
+                      <Folder className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span className="font-medium text-xs text-stone-800">人物档案</span>
+                      <span className="text-[10px] text-stone-400 font-mono">
+                        ({storyBible?.characters?.length || 0})
+                      </span>
+                    </div>
+
                     <button
                       onClick={(e) => handleCreateStory('character', e)}
-                      className="p-0.5 hover:text-stone-800 rounded"
-                      title="新建人物小传卡片"
+                      className="p-0.5 hover:text-stone-900 text-stone-500 hover:bg-stone-200 rounded"
+                      title="新建人物小传"
                     >
-                      <Plus className="w-3 h-3" />
+                      <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
 
-                  {storyBible?.characters?.map((char) => {
-                    const isActive =
-                      activeDocumentType === 'story' &&
-                      activeStoryFile?.relativePath === char.relativePath
-
-                    return (
-                      <div
-                        key={char.id}
-                        onClick={() => selectStoryFile(char)}
-                        className={`group flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
-                          isActive
-                            ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/60'
-                            : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5 truncate flex-1 mr-1">
-                          <User className="w-3 h-3 text-stone-400 shrink-0" />
-                          <span className="truncate">{char.title}</span>
+                  {isCharactersOpen && (
+                    <div className="pl-5 space-y-0.5">
+                      {storyBible?.characters?.length === 0 ? (
+                        <div className="px-2 py-1 text-[11px] text-stone-400">
+                          暂无人物，点击上方 + 新建
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (window.confirm(`确定要删除人物档案《${char.title}》吗？`)) {
-                              deleteStoryFile(char.relativePath)
-                            }
-                          }}
-                          className="p-0.5 text-stone-400 hover:text-rose-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="删除人物档案"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )
-                  })}
+                      ) : (
+                        storyBible?.characters?.map((char) => {
+                          const isActive =
+                            activeDocumentType === 'story' &&
+                            activeStoryFile?.relativePath === char.relativePath
+                          const isEditing = editingStoryRelPath === char.relativePath
+
+                          return (
+                            <div
+                              key={char.id}
+                              onClick={() => selectStoryFile(char)}
+                              onDoubleClick={(e) => handleStartStoryRename(char.relativePath, char.title, e)}
+                              className={`group flex items-center justify-between px-2 py-1 rounded-md text-xs cursor-pointer transition-colors ${
+                                isActive
+                                  ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/60'
+                                  : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 truncate flex-1 mr-1">
+                                <User className="w-3 h-3 text-blue-600 shrink-0" />
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    value={editStoryTitleValue}
+                                    onChange={(e) => setEditStoryTitleValue(e.target.value)}
+                                    onBlur={() => handleFinishStoryRename(char.relativePath)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleFinishStoryRename(char.relativePath)
+                                      if (e.key === 'Escape') setEditingStoryRelPath(null)
+                                    }}
+                                    autoFocus
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="bg-white border border-stone-400 rounded px-1 text-xs text-stone-900 w-full focus:outline-none"
+                                  />
+                                ) : (
+                                  <span className="truncate text-[11px]">{char.title}</span>
+                                )}
+                              </div>
+
+                              {!isEditing && (
+                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={(e) => handleStartStoryRename(char.relativePath, char.title, e)}
+                                    className="p-0.5 text-stone-400 hover:text-stone-700 rounded"
+                                    title="重命名人物"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (window.confirm(`确定要删除人物档案《${char.title}》吗？`)) {
+                                        deleteStoryFile(char.relativePath)
+                                      }
+                                    }}
+                                    className="p-0.5 text-stone-400 hover:text-rose-600 rounded"
+                                    title="删除人物档案"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* 3. Threads (暗线) */}
                 {storyBible?.ledger && (
-                  <div className="space-y-0.5">
-                    <div className="px-2 py-1 text-[10px] font-medium text-stone-400">暗线</div>
-                    <div
-                      onClick={() => selectStoryFile(storyBible.ledger!)}
-                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
-                        activeDocumentType === 'story' &&
-                        activeStoryFile?.relativePath === storyBible.ledger.relativePath
-                          ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/60'
-                          : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5 truncate">
-                        <Bookmark className="w-3 h-3 text-purple-600 shrink-0" />
-                        <span className="truncate">暗线</span>
-                      </div>
+                  <div
+                    onClick={() => selectStoryFile(storyBible.ledger!)}
+                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
+                      activeDocumentType === 'story' &&
+                      activeStoryFile?.relativePath === storyBible.ledger.relativePath
+                        ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/60'
+                        : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Bookmark className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                      <span className="font-medium text-xs text-stone-800">暗线</span>
                     </div>
                   </div>
                 )}

@@ -229,6 +229,24 @@ export function registerIpcHandlers(): void {
     }
   )
 
+  ipcMain.handle(
+    IPC_CHANNELS.STORY_RENAME_FILE,
+    async (
+      _event,
+      {
+        projectPath,
+        relativePath,
+        newTitle
+      }: {
+        projectPath: string
+        relativePath: string
+        newTitle: string
+      }
+    ) => {
+      return globalProjectManager.renameStoryFile(projectPath, relativePath, newTitle)
+    }
+  )
+
   // Library Handlers
   ipcMain.handle(IPC_CHANNELS.LIBRARY_LIST, async () => {
     return globalLibraryManager.listLibraryFiles()
