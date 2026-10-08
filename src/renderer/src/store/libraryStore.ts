@@ -4,21 +4,24 @@ import { LibraryBook, LibraryBookContent } from '../../../shared/types/ipc'
 interface LibraryState {
   books: LibraryBook[]
   isLoading: boolean
+  isLibraryModalOpen: boolean
+  selectedBookFilename: string | null
   previewBook: LibraryBookContent | null
-  isPreviewOpen: boolean
   fetchBooks: () => Promise<void>
   importBooks: () => Promise<void>
   openFolder: () => Promise<void>
-  openPreview: (filename: string) => Promise<void>
-  closePreview: () => void
+  openLibraryModal: () => Promise<void>
+  closeLibraryModal: () => void
+  selectBook: (filename: string) => Promise<void>
   deleteBook: (filename: string) => Promise<void>
 }
 
 export const useLibraryStore = create<LibraryState>((set, get) => ({
   books: [],
   isLoading: false,
+  isLibraryModalOpen: false,
+  selectedBookFilename: null,
   previewBook: null,
-  isPreviewOpen: false,
 
   fetchBooks: async () => {
     set({ isLoading: true })
@@ -35,6 +38,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       const res = await window.api.importLibraryFiles()
       if (res.success && res.books) {
         set({ books: res.books })
+        if (res.books.length > 0 && !get().selectedBookFilename) {
+          get().selectBook(res.books[0].filename)
+        }
       }
     } catch {
       // ignore
@@ -49,21 +55,44 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     }
   },
 
-  openPreview: async (filename: string) => {
-    try {
-      const content = await window.api.readLibraryFileContent(filename)
-      set({ previewBook: content, isPreviewOpen: true })
-    } catch {
-      // ignore
+  openLibraryModal: async () => {
+    set({ isLibraryModalOpen: true })
+    await get().fetchBooks()
+    const { books, selectedBookFilename } = get()
+    if (books.length > 0) {
+      const target = selectedBookFilename && books.some((b) => b.filename === selectedBookFilename)
+        ? selectedBookFilename
+        : books[0].filename
+      await get().selectBook(target)
     }
   },
 
-  closePreview: () => set({ isPreviewOpen: false, previewBook: null }),
+  closeLibraryModal: () => {
+    set({ isLibraryModalOpen: false })
+  },
+
+  selectBook: async (filename: string) => {
+    set({ selectedBookFilename: filename })
+    try {
+      const content = await window.api.readLibraryFileContent(filename)
+      set({ previewBook: content })
+    } catch {
+      set({ previewBook: null })
+    }
+  },
 
   deleteBook: async (filename: string) => {
     try {
       await window.api.deleteLibraryFile(filename)
       await get().fetchBooks()
+      const { books, selectedBookFilename } = get()
+      if (selectedBookFilename === filename) {
+        if (books.length > 0) {
+          get().selectBook(books[0].filename)
+        } else {
+          set({ selectedBookFilename: null, previewBook: null })
+        }
+      }
     } catch {
       // ignore
     }

@@ -38,7 +38,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
     fetchBooks,
     importBooks,
     openFolder,
-    openPreview
+    openLibraryModal
   } = useLibraryStore()
 
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null)
@@ -64,10 +64,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
   return (
     <aside
       style={{ width: `${width}px` }}
-      className="border-r border-stone-200 bg-[#f7f7f5] flex flex-col justify-between select-none shrink-0 overflow-hidden"
+      className="border-r border-stone-200 bg-[#f7f7f5] flex flex-col justify-between select-none shrink-0 overflow-hidden h-full"
     >
-      {/* Top Part: Project Info & Chapter Tree */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-4">
+      {/* Top Main Area: Project Info & Chapter Tree */}
+      <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-3">
         {/* Project Card */}
         {!projectPath ? (
           <div className="p-3 rounded-lg bg-white border border-stone-200/80 space-y-2.5">
@@ -114,10 +114,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
           </div>
         )}
 
-        {/* Chapters Section (Only displayed when project is open) */}
+        {/* Chapters Section (Dedicated space for manuscript) */}
         {projectPath && (
-          <div>
-            <div className="flex items-center justify-between px-2 mb-1.5">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between px-2 mb-1">
               <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
                 手稿章节 ({chapters.length})
               </span>
@@ -141,16 +141,16 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                     key={ch.id}
                     onClick={() => selectChapter(ch.id)}
                     onDoubleClick={(e) => handleStartRename(ch.id, ch.title, e)}
-                    className={`group flex items-center justify-between px-2.5 py-1.5 rounded-md cursor-pointer text-xs transition-all ${
+                    className={`group flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
                       isActive
-                        ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/80'
-                        : 'text-stone-600 hover:bg-stone-200/40 hover:text-stone-900'
+                        ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/60'
+                        : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate flex-1 mr-1">
                       <FileText
                         className={`w-3.5 h-3.5 shrink-0 ${
-                          isActive ? 'text-stone-800' : 'text-stone-400'
+                          isActive ? 'text-stone-900' : 'text-stone-400'
                         }`}
                       />
                       {isEditing ? (
@@ -207,55 +207,41 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
             </div>
           </div>
         )}
+      </div>
 
-        {/* Library Section (Always available, completely decoupled from project) */}
-        <div>
-          <div className="flex items-center justify-between px-2 mb-1.5">
-            <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider flex items-center gap-1.5">
-              <BookOpen className="w-3.5 h-3.5 text-stone-500" />
-              素材藏书库 ({books.length})
+      {/* Bottom Pinned Library Entry (Ultra compact, clean bottom entry) */}
+      <div className="p-2 border-t border-stone-200 bg-white/70 shrink-0">
+        <div
+          onClick={openLibraryModal}
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-stone-100/90 cursor-pointer transition-colors text-xs text-stone-700 border border-transparent hover:border-stone-200"
+          title="点击打开藏书库管理与阅读弹层"
+        >
+          <div className="flex items-center gap-2 truncate">
+            <BookOpen className="w-3.5 h-3.5 text-stone-600 shrink-0" />
+            <span className="font-medium text-xs text-stone-800">藏书库</span>
+            <span className="text-[10px] text-stone-400 font-mono px-1.5 py-0.2 rounded-full bg-stone-100 border border-stone-200">
+              {books.length}
             </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={importBooks}
-                className="p-1 rounded text-stone-500 hover:text-stone-900 hover:bg-stone-200/60 transition-colors"
-                title="导入外部 TXT 长篇小说"
-              >
-                <Upload className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={openFolder}
-                className="p-1 rounded text-stone-500 hover:text-stone-900 hover:bg-stone-200/60 transition-colors"
-                title="在文件管理器中打开藏书目录"
-              >
-                <FolderOpen className="w-3.5 h-3.5" />
-              </button>
-            </div>
           </div>
 
-          <div className="space-y-0.5 max-h-48 overflow-y-auto scrollbar-thin">
-            {books.length === 0 ? (
-              <div className="px-2 py-3 text-center rounded-lg border border-dashed border-stone-300 text-stone-400 text-[11px]">
-                暂无藏书，点击上方按钮导入
-              </div>
-            ) : (
-              books.map((book) => {
-                const sizeKb = (book.size / 1024).toFixed(0)
-                return (
-                  <div
-                    key={book.filename}
-                    onClick={() => openPreview(book.filename)}
-                    className="flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-stone-700 hover:bg-stone-200/60 hover:text-stone-900 cursor-pointer transition-colors"
-                    title={`点击预览阅读: ${book.filename}`}
-                  >
-                    <span className="truncate flex-1 mr-2">{book.filename}</span>
-                    <span className="text-[10px] text-stone-400 font-mono shrink-0">
-                      {sizeKb}K
-                    </span>
-                  </div>
-                )
-              })
-            )}
+          <div
+            className="flex items-center gap-1 shrink-0 ml-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={importBooks}
+              className="p-1 text-stone-400 hover:text-stone-700 rounded hover:bg-stone-200/60 transition-colors"
+              title="导入外部 TXT 长篇小说"
+            >
+              <Upload className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={openFolder}
+              className="p-1 text-stone-400 hover:text-stone-700 rounded hover:bg-stone-200/60 transition-colors"
+              title="在系统文件管理器中打开藏书目录"
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </div>
