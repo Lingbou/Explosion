@@ -305,18 +305,16 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
                         <span className="text-[10px] text-stone-300 font-mono">
                           {sess.messages.length}条
                         </span>
-                        {sessions.length > 1 && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              deleteSession(sess.id)
-                            }}
-                            className="p-0.5 text-stone-400 hover:text-rose-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="删除此会话"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        )}
+                        <button
+    onClick={(e) => {
+      e.stopPropagation()
+      deleteSession(sess.id)
+    }}
+    className="p-1 text-stone-400 hover:text-rose-600 rounded hover:bg-stone-200/60 transition-colors shrink-0"
+    title="删除此会话"
+  >
+    <Trash2 className="w-3 h-3" />
+  </button>
                       </div>
                     </div>
                   )
@@ -329,7 +327,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
         {/* Right Header Controls: Single Clean [+ 新建会话] & [清空] */}
         <div className="flex items-center gap-1">
           <button
-            onClick={() => createSession()}
+            onClick={() => { createSession(); setIsSessionDropdownOpen(false) }}
             className="flex items-center gap-1 px-2 py-1 rounded text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-colors text-xs font-medium"
             title="开启全新会话"
           >

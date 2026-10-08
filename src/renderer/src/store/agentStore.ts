@@ -121,8 +121,19 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     const { sessions, activeSessionId } = get()
     const current = sessions.find((s) => s.id === activeSessionId)
 
-    // Prohibit duplicate empty sessions: if current session has 0 messages, do not create a new one!
+    // Prohibit duplicate empty sessions: if current session has 0 messages, ensure its title resets to '新会话'
     if (current && current.messages.length === 0) {
+      if (current.title !== '新会话') {
+        const updated = sessions.map((s) => (s.id === current.id ? { ...s, title: '新会话' } : s))
+        set({
+          sessions: updated,
+          activeSessionId: current.id,
+          currentThinking: '',
+          currentDelta: '',
+          currentTraces: []
+        })
+        saveSessionsToStorage(updated, current.id)
+      }
       return current.id
     }
 
@@ -181,7 +192,13 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         createdAt: Date.now(),
         updatedAt: Date.now()
       }
-      set({ sessions: [freshSession], activeSessionId: freshSession.id })
+      set({
+        sessions: [freshSession],
+        activeSessionId: freshSession.id,
+        currentThinking: '',
+        currentDelta: '',
+        currentTraces: []
+      })
       saveSessionsToStorage([freshSession], freshSession.id)
       return
     }
@@ -191,7 +208,13 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       nextActiveId = remaining[0].id
     }
 
-    set({ sessions: remaining, activeSessionId: nextActiveId })
+    set({
+      sessions: remaining,
+      activeSessionId: nextActiveId,
+      currentThinking: '',
+      currentDelta: '',
+      currentTraces: []
+    })
     saveSessionsToStorage(remaining, nextActiveId)
   },
 
@@ -206,7 +229,9 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   clearMessages: () => {
     const { sessions, activeSessionId } = get()
     const updated = sessions.map((s) =>
-      s.id === activeSessionId ? { ...s, messages: [], updatedAt: Date.now() } : s
+      s.id === activeSessionId
+        ? { ...s, title: '新会话', messages: [], updatedAt: Date.now() }
+        : s
     )
     set({
       sessions: updated,
