@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import { AgentTool, AgentToolContext } from './types'
+import { validateSandboxPath } from './sandbox'
 
 export function decodeBuffer(buf: Buffer): string {
   try {
@@ -40,7 +41,7 @@ function formatBytes(bytes: number): string {
 export const readFileTool: AgentTool = {
   name: 'read_file',
   description:
-    '读取本地磁盘上的文本文件内容，自动兼容并解码 UTF-8 与 GB18030/GBK 编码。可用于读取小说手稿章节、素材藏书库书籍、设定资料或脚本文件。',
+    '读取本地磁盘上的文本文件内容，自动兼容并解码 UTF-8 与 GB18030/GBK 编码。受轻沙箱限制，仅允许访问当前小说工程目录与 ~/.explosion/。',
   parameters: {
     type: 'object',
     properties: {
@@ -60,7 +61,12 @@ export const readFileTool: AgentTool = {
       return '读取失败: 请提供有效的文件路径 path。'
     }
 
-    const resolved = resolveFilePath(args.path, context.projectPath)
+    const sandbox = validateSandboxPath(args.path, context)
+    if (!sandbox.allowed) {
+      return sandbox.reason || '[轻沙箱安全拦截]: 访问路径超出允许的工作区范围。'
+    }
+    const resolved = sandbox.resolvedPath
+
     if (!fs.existsSync(resolved)) {
       return `读取失败: 目标文件不存在 -> ${resolved}`
     }
@@ -97,7 +103,7 @@ export const readFileTool: AgentTool = {
 export const writeFileTool: AgentTool = {
   name: 'write_file',
   description:
-    '直接在本地磁盘上创建或覆盖写入文件。若写入的是当前打开小说工程的手稿章节（如 manuscript/001-第一章.txt），工作台界面将自动无感实时热重载手稿！注意：小说手稿正文容器必须保持纯文本，严禁写入任何 Markdown 标记（如 #、**、- 等）。',
+    '直接在本地磁盘上创建或覆盖写入文件。受轻沙箱限制，仅允许在当前小说工程目录或 ~/.explosion/ 范围内写入。写入手稿后工作台自动热重载。严禁包含 Markdown 标记。',
   parameters: {
     type: 'object',
     properties: {
@@ -120,7 +126,11 @@ export const writeFileTool: AgentTool = {
       return '写入失败: 请提供要写入的内容 content。'
     }
 
-    const resolved = resolveFilePath(args.path, context.projectPath)
+    const sandbox = validateSandboxPath(args.path, context)
+    if (!sandbox.allowed) {
+      return sandbox.reason || '[轻沙箱安全拦截]: 写入路径超出允许的工作区范围。'
+    }
+    const resolved = sandbox.resolvedPath
 
     try {
       const parentDir = path.dirname(resolved)
@@ -143,7 +153,7 @@ export const writeFileTool: AgentTool = {
 export const editFileTool: AgentTool = {
   name: 'edit_file',
   description:
-    '对本地文本文件进行精准局部替换（将 old_str 替换为 new_str）。适用于长篇手稿或设定的局部润色与修改。若修改当前手稿，编辑器将实时热重载。手稿中严禁 Markdown 标记。',
+    '对本地文本文件进行精准局部替换（将 old_str 替换为 new_str）。受轻沙箱限制，仅允许在当前小说工程目录或 ~/.explosion/ 下编辑。手稿中严禁 Markdown 标记。',
   parameters: {
     type: 'object',
     properties: {
@@ -176,7 +186,12 @@ export const editFileTool: AgentTool = {
       return '替换失败: 未提供新文本 new_str。'
     }
 
-    const resolved = resolveFilePath(args.path, context.projectPath)
+    const sandbox = validateSandboxPath(args.path, context)
+    if (!sandbox.allowed) {
+      return sandbox.reason || '[轻沙箱安全拦截]: 编辑路径超出允许的工作区范围。'
+    }
+    const resolved = sandbox.resolvedPath
+
     if (!fs.existsSync(resolved)) {
       return `替换失败: 目标文件不存在 -> ${resolved}`
     }
@@ -208,7 +223,7 @@ export const editFileTool: AgentTool = {
 export const listDirTool: AgentTool = {
   name: 'list_dir',
   description:
-    '列出指定目录下的文件与子目录列表、大小及修改时间。可用于查看工程目录结构、手稿章节列表或 ~/.explosion/library/ 藏书库。',
+    '列出指定目录下的文件与子目录列表、大小及修改时间。受轻沙箱限制，仅允许查看当前小说工程目录或 ~/.explosion/。',
   parameters: {
     type: 'object',
     properties: {
@@ -253,7 +268,12 @@ export const listDirTool: AgentTool = {
     }
 
     if (args.path?.trim()) {
-      const resolved = resolveFilePath(args.path, context.projectPath)
+      const sandbox = validateSandboxPath(args.path, context)
+      if (!sandbox.allowed) {
+        return sandbox.reason || '[轻沙箱安全拦截]: 查看目录超出允许的工作区范围。'
+      }
+      const resolved = sandbox.resolvedPath
+
       if (!fs.existsSync(resolved)) {
         return `目录不存在: ${resolved}`
       }

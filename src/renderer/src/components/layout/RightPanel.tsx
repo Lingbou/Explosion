@@ -27,7 +27,25 @@ interface RightPanelProps {
 }
 
 function getToolMeta(toolName: string) {
-  switch (toolName) {
+  let normalized = (toolName || '').trim()
+
+  // If toolName has JSON or braces, resolve intent
+  if (normalized.includes('{') || normalized.startsWith('{')) {
+    if (normalized.includes('command')) normalized = 'exec_command'
+    else if (normalized.includes('old_str')) normalized = 'edit_file'
+    else if (normalized.includes('content') && normalized.includes('path')) normalized = 'write_file'
+    else if (normalized.includes('query')) normalized = 'web_search'
+    else if (normalized.includes('url')) normalized = 'web_extract'
+    else if (normalized.includes('path')) normalized = 'read_file'
+    else normalized = 'read_file'
+  }
+
+  // Strip standard prefixes
+  if (normalized.startsWith('functions.')) normalized = normalized.slice(10)
+  if (normalized.startsWith('tools.')) normalized = normalized.slice(6)
+  if (normalized.startsWith('default_api:')) normalized = normalized.slice(12)
+
+  switch (normalized) {
     case 'exec_command':
       return {
         label: '执行终端命令',
@@ -72,7 +90,7 @@ function getToolMeta(toolName: string) {
       }
     default:
       return {
-        label: toolName,
+        label: '读取与操作文件',
         color: 'text-stone-600 bg-stone-50 border-stone-200',
         icon: FileText
       }
@@ -80,11 +98,11 @@ function getToolMeta(toolName: string) {
 }
 
 function formatTraceArgs(toolName: string, args: Record<string, unknown>): string {
+  if (args && args.path) {
+    return String(args.path)
+  }
   if (toolName === 'exec_command' && args.command) {
     return String(args.command)
-  }
-  if ((toolName === 'write_file' || toolName === 'edit_file' || toolName === 'read_file') && args.path) {
-    return String(args.path)
   }
   if (toolName === 'web_search' && args.query) {
     return `"${String(args.query)}"`
@@ -95,7 +113,13 @@ function formatTraceArgs(toolName: string, args: Record<string, unknown>): strin
   if (toolName === 'list_dir') {
     return String(args.path || '默认工程与藏书库')
   }
-  return JSON.stringify(args)
+  if (args && args.command) {
+    return String(args.command)
+  }
+  if (args && args.query) {
+    return `"${String(args.query)}"`
+  }
+  return ''
 }
 
 const TraceCard: React.FC<{ trace: AgentTraceStep }> = ({ trace }) => {

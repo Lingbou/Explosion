@@ -18,6 +18,88 @@ export interface AgentRunnerOptions {
   maxTurns?: number
 }
 
+export function resolveToolCallIntent(rawName: string, rawArguments: any): {
+  name: string
+  args: Record<string, any>
+} {
+  let name = (rawName || '').trim()
+  let args: Record<string, any> = {}
+
+  // 1. Parse rawArguments first
+  if (typeof rawArguments === 'string') {
+    try {
+      args = JSON.parse(rawArguments)
+    } catch {
+      args = rawArguments ? { raw: rawArguments } : {}
+    }
+  } else if (rawArguments && typeof rawArguments === 'object') {
+    args = { ...rawArguments }
+  }
+
+  // 2. Strip standard prefixes like 'functions.', 'tools.', 'call_'
+  if (name.startsWith('functions.')) name = name.slice(10)
+  if (name.startsWith('tools.')) name = name.slice(6)
+  if (name.startsWith('default_api:')) name = name.slice(12)
+
+  // 3. Detect if name itself is a stringified JSON (e.g. {"path": "..."})
+  if (name.startsWith('{') || name.includes('{')) {
+    try {
+      const parsedNameObj = JSON.parse(name)
+      if (parsedNameObj && typeof parsedNameObj === 'object') {
+        args = { ...args, ...parsedNameObj }
+        if (parsedNameObj.name && typeof parsedNameObj.name === 'string') {
+          name = parsedNameObj.name
+        } else if (parsedNameObj.tool && typeof parsedNameObj.tool === 'string') {
+          name = parsedNameObj.tool
+        } else if (parsedNameObj.function && typeof parsedNameObj.function === 'string') {
+          name = parsedNameObj.function
+        } else {
+          name = ''
+        }
+      }
+    } catch {
+      const pathMatch = name.match(/["']path["']\s*:\s*["']([^"']+)["']/)
+      if (pathMatch) {
+        args.path = pathMatch[1]
+      }
+      name = ''
+    }
+  }
+
+  // 4. Auto-heal/infer tool name from args if name is empty or not in known tools
+  const KNOWN_TOOLS = [
+    'exec_command',
+    'read_file',
+    'write_file',
+    'edit_file',
+    'list_dir',
+    'web_search',
+    'web_extract'
+  ]
+
+  if (!KNOWN_TOOLS.includes(name)) {
+    if (args.command) {
+      name = 'exec_command'
+    } else if (args.old_str !== undefined && args.new_str !== undefined) {
+      name = 'edit_file'
+    } else if (args.content !== undefined && args.path) {
+      name = 'write_file'
+    } else if (args.path) {
+      if (args.recursive !== undefined || String(args.path).endsWith('/')) {
+        name = 'list_dir'
+      } else {
+        name = 'read_file'
+      }
+    } else if (args.query) {
+      name = 'web_search'
+    } else if (args.url) {
+      name = 'web_extract'
+    }
+  }
+
+  return { name, args }
+}
+
 export class AgentRunner {
   private activeAbortControllers = new Map<string, AbortController>()
 
@@ -178,34 +260,33 @@ export class AgentRunner {
             return
           }
 
-          let parsedArgs: Record<string, any> = {}
-          try {
-            parsedArgs = typeof tc.arguments === 'string' ? JSON.parse(tc.arguments) : tc.arguments || {}
-          } catch {
-            parsedArgs = { raw: tc.arguments }
-          }
+          // Resolve tool call name & arguments with auto-healing
+          const { name: resolvedName, args: resolvedArgs } = resolveToolCallIntent(
+            tc.name,
+            tc.arguments
+          )
 
           onEvent({
             taskId,
             type: 'tool_start',
             toolCall: {
               id: tc.id,
-              name: tc.name,
-              args: parsedArgs
+              name: resolvedName,
+              args: resolvedArgs
             }
           })
 
-          const tool = findAgentTool(tc.name)
+          const tool = findAgentTool(resolvedName)
           const startTime = performance.now()
           let resultText = ''
           let toolError: string | undefined
 
           if (!tool) {
-            resultText = `执行失败: 未识别的工具 "${tc.name}"`
+            resultText = `执行失败: 未识别的工具 "${resolvedName || tc.name}"`
             toolError = resultText
           } else {
             try {
-              resultText = await tool.execute(parsedArgs, {
+              resultText = await tool.execute(resolvedArgs, {
                 projectPath: taskOptions.projectPath,
                 activeChapterFilename: taskOptions.activeChapterFilename,
                 onFileModified: (filePath, fileContent) => {
@@ -225,7 +306,7 @@ export class AgentRunner {
             type: 'tool_result',
             toolResult: {
               id: tc.id,
-              name: tc.name,
+              name: resolvedName,
               result: resultText,
               error: toolError,
               durationMs
