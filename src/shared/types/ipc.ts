@@ -91,13 +91,41 @@ export interface AgentToolResultInfo {
   durationMs: number
 }
 
+export interface SubAgentStepInfo {
+  id: string
+  toolName: string
+  args: Record<string, unknown>
+  result?: string
+  error?: string
+  durationMs?: number
+  status: 'running' | 'success' | 'error'
+  timestamp: number
+}
+
+export interface SubAgentTaskInfo {
+  id: string
+  parentTaskId: string
+  name: string
+  instruction: string
+  status: 'running' | 'completed' | 'failed' | 'terminated'
+  stepsCount: number
+  durationMs?: number
+  startTime: number
+  endTime?: number
+  output?: string
+  modifiedFiles: string[]
+  steps: SubAgentStepInfo[]
+  error?: string
+}
+
 export interface AgentStreamEvent {
   taskId: string
-  type: 'thinking' | 'delta' | 'tool_start' | 'tool_result' | 'done' | 'error'
+  type: 'thinking' | 'delta' | 'tool_start' | 'tool_result' | 'subagent_update' | 'done' | 'error'
   delta?: string
   thinkingDelta?: string
   toolCall?: AgentToolCallInfo
   toolResult?: AgentToolResultInfo
+  subagent?: SubAgentTaskInfo
   error?: string
   done?: boolean
 }

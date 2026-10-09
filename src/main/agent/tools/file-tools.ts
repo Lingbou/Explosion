@@ -1,3 +1,4 @@
+import { validateSilentGuardrails, isManuscriptPath } from "../guardrails/silent-guardrails"
 import { globalSnapshotManager } from '../../project/snapshot-manager'
 import fs from 'fs'
 import path from 'path'
@@ -133,6 +134,14 @@ export const writeFileTool: AgentTool = {
     }
     const resolved = sandbox.resolvedPath
 
+    // 静默去 AI 味门禁: 若落盘目标为手稿，执行毫秒级排查
+    if (isManuscriptPath(resolved) || (context.activeChapterFilename && resolved.endsWith(context.activeChapterFilename))) {
+      const guardResult = validateSilentGuardrails(args.content)
+      if (!guardResult.passed) {
+        return guardResult.formattedMessage!
+      }
+    }
+
     try {
       const parentDir = path.dirname(resolved)
       if (!fs.existsSync(parentDir)) {
@@ -201,6 +210,14 @@ export const editFileTool: AgentTool = {
       return sandbox.reason || '[轻沙箱安全拦截]: 编辑路径超出允许的工作区范围。'
     }
     const resolved = sandbox.resolvedPath
+
+    // 静默去 AI 味门禁: 若目标为手稿，检查待写入的新内容
+    if (isManuscriptPath(resolved) || (context.activeChapterFilename && resolved.endsWith(context.activeChapterFilename))) {
+      const guardResult = validateSilentGuardrails(args.new_str)
+      if (!guardResult.passed) {
+        return guardResult.formattedMessage!
+      }
+    }
 
     if (!fs.existsSync(resolved)) {
       return `替换失败: 目标文件不存在 -> ${resolved}`

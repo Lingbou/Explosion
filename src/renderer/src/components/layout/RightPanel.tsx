@@ -18,9 +18,11 @@ import {
   Plus,
   MessageSquare,
   Trash2,
-  X
+  X,
+  Cpu
 } from 'lucide-react'
 import { useAgentStore, AgentTraceStep } from '../../store/agentStore'
+import { SubAgentTaskInfo } from '../../../../shared/types/ipc'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useConfigStore } from '../../store/configStore'
 import { useLibraryStore } from '../../store/libraryStore'
@@ -115,6 +117,30 @@ function getToolMeta(toolName: string) {
         color: 'text-indigo-600 bg-indigo-50 border-indigo-200',
         icon: FolderTree
       }
+    case 'spawn_subagent':
+      return {
+        label: '派生 Sub-agent 子任务',
+        color: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+        icon: Cpu
+      }
+    case 'await_subagent':
+      return {
+        label: '等待 Sub-agent 完成',
+        color: 'text-violet-600 bg-violet-50 border-violet-200',
+        icon: Loader2
+      }
+    case 'terminate_subagent':
+      return {
+        label: '终止 Sub-agent 子任务',
+        color: 'text-rose-600 bg-rose-50 border-rose-200',
+        icon: Square
+      }
+    case 'list_subagents':
+      return {
+        label: '查看 Sub-agent 列表',
+        color: 'text-indigo-500 bg-indigo-50 border-indigo-200',
+        icon: FolderTree
+      }
     default:
       return {
         label: '读取与操作文件',
@@ -142,6 +168,12 @@ function formatTraceArgs(toolName: string, args: Record<string, unknown>): strin
   }
   if (toolName === 'list_dir') {
     return String(args.path || '默认工程与资料库')
+  }
+  if (toolName === 'spawn_subagent' && args.task_name) {
+    return String(args.task_name)
+  }
+  if ((toolName === 'await_subagent' || toolName === 'terminate_subagent') && args.subagent_id) {
+    return String(args.subagent_id)
   }
   if (args && args.command) {
     return String(args.command)
@@ -223,6 +255,143 @@ const TraceCard: React.FC<{ trace: AgentTraceStep }> = ({ trace }) => {
   )
 }
 
+export const SubAgentTaskCard: React.FC<{ subagent: SubAgentTaskInfo }> = ({ subagent }) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const isRunning = subagent.status === 'running'
+  const isCompleted = subagent.status === 'completed'
+  const isError = subagent.status === 'failed' || subagent.status === 'terminated'
+
+  return (
+    <div className="border border-stone-200 rounded-lg overflow-hidden bg-white shadow-2xs text-[11px] font-sans">
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-2.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-stone-50 transition-colors select-none"
+      >
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="p-1 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 shrink-0">
+            {isRunning ? (
+              <Loader2 className="w-3 h-3 animate-spin text-indigo-600" />
+            ) : (
+              <Cpu className="w-3 h-3 text-indigo-700" />
+            )}
+          </span>
+          <span className="font-semibold text-stone-800 shrink-0">⚙️ 子任务:</span>
+          <span className="text-stone-700 font-medium truncate max-w-[170px]" title={subagent.name}>
+            {subagent.name}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          {isRunning && (
+            <span className="flex items-center gap-1 text-amber-600">
+              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+              <span className="text-[10px] font-medium">运行中</span>
+              <span className="text-[9px] font-mono text-stone-400">({subagent.stepsCount}步)</span>
+            </span>
+          )}
+          {isCompleted && (
+            <span className="flex items-center gap-1 text-emerald-600">
+              <CheckCircle2 className="w-3 h-3" />
+              <span className="text-[10px] font-medium">已完成</span>
+              <span className="text-[9px] font-mono text-stone-400">
+                ({subagent.stepsCount}步耗时 {subagent.durationMs}ms)
+              </span>
+            </span>
+          )}
+          {isError && (
+            <span className="flex items-center gap-1 text-red-600">
+              <AlertCircle className="w-3 h-3" />
+              <span className="text-[10px]">{subagent.status === 'terminated' ? '已终止' : '失败'}</span>
+            </span>
+          )}
+          {isOpen ? (
+            <ChevronDown className="w-3 h-3 text-stone-400" />
+          ) : (
+            <ChevronRight className="w-3 h-3 text-stone-400" />
+          )}
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="border-t border-stone-100 bg-stone-50/70 p-2 space-y-2 text-[10px]">
+          <div>
+            <span className="text-stone-400 block mb-0.5">任务指令:</span>
+            <div className="p-1.5 rounded bg-white border border-stone-200 text-stone-700 whitespace-pre-wrap leading-relaxed font-sans max-h-28 overflow-y-auto">
+              {subagent.instruction}
+            </div>
+          </div>
+
+          {subagent.steps && subagent.steps.length > 0 && (
+            <div>
+              <span className="text-stone-400 block mb-0.5">
+                执行轨迹 ({subagent.steps.length} 步):
+              </span>
+              <div className="space-y-1 max-h-36 overflow-y-auto">
+                {subagent.steps.map((st, i) => (
+                  <div
+                    key={st.id || i}
+                    className="p-1.5 rounded bg-white border border-stone-200 flex items-start justify-between gap-2 font-mono text-[9px]"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1 font-semibold text-stone-800">
+                        <span className="text-stone-400">#{i + 1}</span>
+                        <span className="text-indigo-600">{st.toolName}</span>
+                        {st.status === 'running' && (
+                          <Loader2 className="w-2.5 h-2.5 animate-spin text-amber-500" />
+                        )}
+                        {st.status === 'success' && (
+                          <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+                        )}
+                        {st.status === 'error' && (
+                          <AlertCircle className="w-2.5 h-2.5 text-red-500" />
+                        )}
+                      </div>
+                      <div className="text-stone-500 truncate mt-0.5">
+                        {JSON.stringify(st.args)}
+                      </div>
+                    </div>
+                    {st.durationMs !== undefined && (
+                      <span className="text-stone-400 shrink-0">
+                        {st.durationMs}ms
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {subagent.modifiedFiles && subagent.modifiedFiles.length > 0 && (
+            <div>
+              <span className="text-stone-400 block mb-0.5">已修改落盘文件:</span>
+              <div className="flex flex-wrap gap-1">
+                {subagent.modifiedFiles.map((file, idx) => (
+                  <span
+                    key={idx}
+                    className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-mono flex items-center gap-1"
+                  >
+                    <FilePenLine className="w-2.5 h-2.5" />
+                    <span>{file.split('/').slice(-2).join('/')}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {subagent.output && (
+            <div>
+              <span className="text-stone-400 block mb-0.5">子任务汇报产出:</span>
+              <pre className="p-1.5 rounded bg-white border border-stone-200 overflow-x-auto whitespace-pre-wrap text-stone-800 font-serif leading-relaxed max-h-32">
+                {stripMarkdownMarks(subagent.output)}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
   const {
     sessions,
@@ -231,6 +400,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
     currentThinking,
     currentDelta,
     currentTraces,
+    currentSubagents,
     sendTask,
     abortTask,
     createSession,
@@ -267,7 +437,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, currentDelta, currentThinking, currentTraces])
+  }, [messages, currentDelta, currentThinking, currentTraces, currentSubagents])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -585,6 +755,15 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
                   </div>
                 )}
 
+                {/* Sub-agent Task Cards */}
+                {msg.subagents && msg.subagents.length > 0 && (
+                  <div className="space-y-1.5">
+                    {msg.subagents.map((sub) => (
+                      <SubAgentTaskCard key={sub.id} subagent={sub} />
+                    ))}
+                  </div>
+                )}
+
                 {/* Final Content: Clean Pure Text with Zero Markdown Pollution */}
                 <div className="p-3 rounded-lg border border-stone-200 bg-white text-stone-900 font-serif leading-relaxed select-text shadow-2xs whitespace-pre-wrap">
                   {stripMarkdownMarks(msg.content)}
@@ -615,6 +794,15 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
               <div className="space-y-1.5">
                 {currentTraces.map((trace) => (
                   <TraceCard key={trace.id} trace={trace} />
+                ))}
+              </div>
+            )}
+
+            {/* Live Sub-agents */}
+            {currentSubagents && currentSubagents.length > 0 && (
+              <div className="space-y-1.5">
+                {currentSubagents.map((sub) => (
+                  <SubAgentTaskCard key={sub.id} subagent={sub} />
                 ))}
               </div>
             )}
