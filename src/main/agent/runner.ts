@@ -1,3 +1,4 @@
+import { SubAgentManager, globalSubAgentManager } from "./subagent-manager"
 import { BrowserWindow } from 'electron'
 import path from 'path'
 import {
@@ -15,6 +16,7 @@ import { buildAgentSystemPrompt } from './prompts'
 export interface AgentRunnerOptions {
   llmAdapter?: LLMAdapter
   configStore?: ConfigStore
+  subagentManager?: SubAgentManager
   maxTurns?: number
 }
 
@@ -75,7 +77,11 @@ export function resolveToolCallIntent(rawName: string, rawArguments: any): {
     'list_dir',
     'web_search',
     'web_extract',
-    'search_library'
+    'search_library',
+    'spawn_subagent',
+    'await_subagent',
+    'terminate_subagent',
+    'list_subagents'
   ]
 
   if (!KNOWN_TOOLS.includes(name)) {
@@ -97,6 +103,10 @@ export function resolveToolCallIntent(rawName: string, rawArguments: any): {
       name = 'web_search'
     } else if (args.url) {
       name = 'web_extract'
+    } else if (args.task_name && args.instruction) {
+      name = 'spawn_subagent'
+    } else if (args.subagent_id) {
+      name = 'await_subagent'
     }
   }
 
@@ -116,11 +126,16 @@ export class AgentRunner {
     return this.options?.configStore || globalConfigStore
   }
 
+  private getSubAgentManager(): SubAgentManager {
+    return this.options?.subagentManager || globalSubAgentManager
+  }
+
   public abortTask(taskId: string): boolean {
     const controller = this.activeAbortControllers.get(taskId)
     if (controller) {
       controller.abort()
       this.activeAbortControllers.delete(taskId)
+      this.getSubAgentManager().release(taskId)
       return true
     }
     return false
@@ -305,8 +320,17 @@ export class AgentRunner {
           } else {
             try {
               resultText = await tool.execute(resolvedArgs, {
+                taskId,
                 projectPath: taskOptions.projectPath,
                 activeChapterFilename: taskOptions.activeChapterFilename,
+                subagentManager: this.getSubAgentManager(),
+                onSubAgentUpdate: (subagentInfo) => {
+                  onEvent({
+                    taskId,
+                    type: 'subagent_update',
+                    subagent: subagentInfo
+                  })
+                },
                 onFileModified: (filePath, fileContent) => {
                   this.broadcastFileChange(filePath, fileContent, taskOptions.projectPath)
                 }
@@ -358,6 +382,7 @@ export class AgentRunner {
       }
     } finally {
       this.activeAbortControllers.delete(taskId)
+      this.getSubAgentManager().release(taskId)
     }
   }
 }

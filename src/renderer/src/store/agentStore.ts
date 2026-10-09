@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { AgentStreamEvent, AgentTaskOptions } from '../../../shared/types/ipc'
+import { AgentStreamEvent, AgentTaskOptions, SubAgentTaskInfo } from '../../../shared/types/ipc'
 import { stripMarkdownMarks } from '../lib/typography'
 import { generateSessionTitle } from '../../../shared/utils/session'
 
@@ -23,6 +23,7 @@ export interface AgentMessage {
   content: string
   thinking?: string
   traces?: AgentTraceStep[]
+  subagents?: SubAgentTaskInfo[]
   selectedText?: string
   timestamp: number
 }
@@ -43,6 +44,7 @@ interface AgentState {
   currentThinking: string
   currentDelta: string
   currentTraces: AgentTraceStep[]
+  currentSubagents: SubAgentTaskInfo[]
 
   createSession: () => string
   switchSession: (sessionId: string) => void
@@ -118,6 +120,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   currentThinking: '',
   currentDelta: '',
   currentTraces: [],
+  currentSubagents: [],
 
   createSession: () => {
     const { sessions, activeSessionId } = get()
@@ -132,7 +135,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
           activeSessionId: current.id,
           currentThinking: '',
           currentDelta: '',
-          currentTraces: []
+          currentTraces: [],
+          currentSubagents: []
         })
         saveSessionsToStorage(updated, current.id)
       }
@@ -156,7 +160,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       activeSessionId: newSession.id,
       currentThinking: '',
       currentDelta: '',
-      currentTraces: []
+      currentTraces: [],
+      currentSubagents: []
     })
     saveSessionsToStorage(updatedSessions, newSession.id)
     return newSession.id
@@ -199,7 +204,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         activeSessionId: freshSession.id,
         currentThinking: '',
         currentDelta: '',
-        currentTraces: []
+        currentTraces: [],
+        currentSubagents: []
       })
       saveSessionsToStorage([freshSession], freshSession.id)
       return
@@ -239,7 +245,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       sessions: updated,
       currentThinking: '',
       currentDelta: '',
-      currentTraces: []
+      currentTraces: [],
+      currentSubagents: []
     })
     saveSessionsToStorage(updated, activeSessionId)
   },
@@ -280,7 +287,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       isRunning: true,
       currentThinking: '',
       currentDelta: '',
-      currentTraces: []
+      currentTraces: [],
+      currentSubagents: []
     })
     saveSessionsToStorage(updatedSessionsWithUser, currentSession.id)
 
@@ -295,6 +303,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     let accumulatedDelta = ''
     let accumulatedThinking = ''
     let tracesList: AgentTraceStep[] = []
+    let subagentsList: SubAgentTaskInfo[] = []
 
     try {
       const handle = window.api.agentRunTask(taskOptions, (event: AgentStreamEvent) => {
@@ -329,6 +338,15 @@ export const useAgentStore = create<AgentState>((set, get) => ({
               : t
           )
           set({ currentTraces: tracesList })
+        } else if (event.type === 'subagent_update' && event.subagent) {
+          const sub = event.subagent
+          const existingIdx = subagentsList.findIndex((s) => s.id === sub.id)
+          if (existingIdx >= 0) {
+            subagentsList = subagentsList.map((s, idx) => (idx === existingIdx ? sub : s))
+          } else {
+            subagentsList = [...subagentsList, sub]
+          }
+          set({ currentSubagents: subagentsList })
         } else if (event.type === 'done') {
           // Strictly sanitize markdown symbols out of content!
           const cleanOutput = stripMarkdownMarks(accumulatedDelta)
@@ -336,9 +354,10 @@ export const useAgentStore = create<AgentState>((set, get) => ({
           const assistantMsg: AgentMessage = {
             id: `msg-${Date.now()}-a`,
             role: 'assistant',
-            content: cleanOutput || (tracesList.length > 0 ? '已完成所有自主工具调用调度。' : '完成。'),
+            content: cleanOutput || (tracesList.length > 0 || subagentsList.length > 0 ? '已完成所有自主工具调用调度。' : '完成。'),
             thinking: accumulatedThinking || undefined,
             traces: tracesList.length > 0 ? tracesList : undefined,
+            subagents: subagentsList.length > 0 ? subagentsList : undefined,
             timestamp: Date.now()
           }
 
@@ -354,7 +373,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
             currentTaskId: null,
             currentThinking: '',
             currentDelta: '',
-            currentTraces: []
+            currentTraces: [],
+            currentSubagents: []
           })
           saveSessionsToStorage(finalizedSessions, currentSession.id)
           handle.unsubscribe()
@@ -364,6 +384,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
             role: 'assistant',
             content: `[执行异常]: ${event.error || '任务执行失败'}`,
             traces: tracesList.length > 0 ? tracesList : undefined,
+            subagents: subagentsList.length > 0 ? subagentsList : undefined,
             timestamp: Date.now()
           }
 
@@ -379,7 +400,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
             currentTaskId: null,
             currentThinking: '',
             currentDelta: '',
-            currentTraces: []
+            currentTraces: [],
+            currentSubagents: []
           })
           saveSessionsToStorage(finalizedSessions, currentSession.id)
           handle.unsubscribe()
@@ -407,7 +429,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         currentTaskId: null,
         currentThinking: '',
         currentDelta: '',
-        currentTraces: []
+        currentTraces: [],
+        currentSubagents: []
       })
       saveSessionsToStorage(finalizedSessions, currentSession.id)
     }
@@ -422,7 +445,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         currentTaskId: null,
         currentThinking: '',
         currentDelta: '',
-        currentTraces: []
+        currentTraces: [],
+        currentSubagents: []
       })
     }
   }

@@ -1,9 +1,13 @@
 import { ToolDefinition } from '../../../shared/types/llm'
+import { SubAgentTaskInfo } from '../../../shared/types/ipc'
 
 export interface AgentToolContext {
   projectPath?: string | null
   activeChapterFilename?: string | null
   onFileModified?: (filePath: string, content: string) => void
+  taskId?: string
+  subagentManager?: any
+  onSubAgentUpdate?: (subagent: SubAgentTaskInfo) => void
 }
 
 export interface AgentToolParamProperty {

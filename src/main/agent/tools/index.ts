@@ -3,6 +3,12 @@ import { execCommandTool } from './exec-command'
 import { readFileTool, writeFileTool, editFileTool, listDirTool } from './file-tools'
 import { webSearchTool, webExtractTool } from './web-tools'
 import { searchLibraryTool } from './search-library'
+import {
+  spawnSubAgentTool,
+  awaitSubAgentTool,
+  terminateSubAgentTool,
+  listSubAgentsTool
+} from './subagent-tools'
 import { ToolDefinition } from '../../../shared/types/llm'
 
 export * from './types'
@@ -11,6 +17,7 @@ export * from './file-tools'
 export * from './web-tools'
 export * from './search-library'
 export * from './sandbox'
+export * from './subagent-tools'
 
 export const AGENT_TOOLS: AgentTool[] = [
   execCommandTool,
@@ -20,7 +27,11 @@ export const AGENT_TOOLS: AgentTool[] = [
   listDirTool,
   webSearchTool,
   webExtractTool,
-  searchLibraryTool
+  searchLibraryTool,
+  spawnSubAgentTool,
+  awaitSubAgentTool,
+  terminateSubAgentTool,
+  listSubAgentsTool
 ]
 
 export const AGENT_TOOL_DEFINITIONS: ToolDefinition[] = AGENT_TOOLS.map(agentToolToDefinition)
