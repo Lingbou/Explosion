@@ -69,7 +69,7 @@ function getToolMeta(toolName: string) {
   switch (normalized) {
     case 'search_library':
       return {
-        label: '原著自然段全文检索',
+        label: '资料库 Hybrid RAG 检索',
         color: 'text-amber-800 bg-amber-50 border-amber-200',
         icon: Search
       }

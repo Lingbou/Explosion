@@ -3,9 +3,12 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import { execSync } from 'child_process'
+import { DatabaseSync } from 'node:sqlite'
 
-describe('organize_library.py Book Splitting Script', () => {
+describe('organize_library.py Book Splitting & Indexing Script', () => {
   let tempSandboxDir: string
+  const testBookName = '大荒记'
+  const cacheBookDir = path.join(os.homedir(), '.explosion', 'cache', 'books', testBookName)
 
   beforeEach(() => {
     tempSandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'explosion-organize-test-'))
@@ -14,6 +17,9 @@ describe('organize_library.py Book Splitting Script', () => {
   afterEach(() => {
     if (fs.existsSync(tempSandboxDir)) {
       fs.rmSync(tempSandboxDir, { recursive: true, force: true })
+    }
+    if (fs.existsSync(cacheBookDir)) {
+      fs.rmSync(cacheBookDir, { recursive: true, force: true })
     }
   })
 
@@ -52,7 +58,7 @@ describe('organize_library.py Book Splitting Script', () => {
 
     expect(output).toContain('成功物理拆解')
 
-    const bookDir = path.join(outDir, '大荒记')
+    const bookDir = path.join(outDir, testBookName)
     expect(fs.existsSync(bookDir)).toBe(true)
 
     const files = fs.readdirSync(bookDir)
@@ -73,9 +79,29 @@ describe('organize_library.py Book Splitting Script', () => {
 
     // Original monolithic file must be automatically removed!
     expect(fs.existsSync(bookFile)).toBe(false)
+
+    // Verify index.db contains both FTS5 table and paragraph_embeddings table
+    const dbPath = path.join(cacheBookDir, 'index.db')
+    expect(fs.existsSync(dbPath)).toBe(true)
+
+    const db = new DatabaseSync(dbPath)
+    const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as any[])
+      .map((t) => t.name)
+    expect(tables).toContain('library_paragraphs')
+    expect(tables).toContain('paragraph_embeddings')
+
+    const pCount = (db.prepare('SELECT count(*) as count FROM library_paragraphs').get() as any).count
+    expect(pCount).toBeGreaterThan(0)
+
+    const vRow = db.prepare('SELECT id, volume, paragraph, embedding FROM paragraph_embeddings LIMIT 1').get() as any
+    if (vRow) {
+      expect(vRow.embedding).toBeDefined()
+      expect(vRow.embedding.byteLength).toBe(768 * 4) // 3072 bytes (768 float32s)
+    }
+    db.close()
   })
 
-  it('keeps original file when --keep-original flag is specified', () => {
+  it('keeps original file when --keep-original flag is specified and supports --no-embeddings', () => {
     const scriptPath = path.resolve(__dirname, '../src/main/library/organize_library.py')
     const bookFile = path.join(tempSandboxDir, 'keep_test.txt')
 
@@ -89,10 +115,30 @@ describe('organize_library.py Book Splitting Script', () => {
     const outDir = path.join(tempSandboxDir, 'out_keep')
     fs.mkdirSync(outDir, { recursive: true })
 
-    execSync(`python3 "${scriptPath}" "${bookFile}" --output-dir "${outDir}" --keep-original`, {
+    execSync(`python3 "${scriptPath}" "${bookFile}" --output-dir "${outDir}" --keep-original --no-embeddings`, {
       encoding: 'utf-8'
     })
 
     expect(fs.existsSync(bookFile)).toBe(true)
+  })
+
+  it('calculates 768-dim query embedding via --embed-query CLI returning valid base64 payload', () => {
+    const scriptPath = path.resolve(__dirname, '../src/main/library/organize_library.py')
+    const stdout = execSync(`python3 "${scriptPath}" --embed-query "南淮城头的暴风雪"`, {
+      encoding: 'utf-8'
+    })
+
+    const parsed = JSON.parse(stdout.trim())
+    expect(parsed.dim).toBe(768)
+    expect(parsed.model).toBe('BAAI/bge-base-zh-v1.5')
+    expect(typeof parsed.embedding).toBe('string')
+
+    const buf = Buffer.from(parsed.embedding, 'base64')
+    expect(buf.length).toBe(768 * 4) // 3072 bytes
+
+    const f32 = new Float32Array(buf.buffer, buf.byteOffset, 768)
+    let norm = 0
+    for (let i = 0; i < 768; i++) norm += f32[i] * f32[i]
+    expect(Math.sqrt(norm)).toBeCloseTo(1.0, 3)
   })
 })
