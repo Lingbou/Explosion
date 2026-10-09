@@ -273,6 +273,37 @@ export function registerIpcHandlers(): void {
     return globalLibraryManager.processLibraryFile(filename)
   })
 
+    // Window Controls (Frameless Titlebar)
+  ipcMain.handle(IPC_CHANNELS.WINDOW_MINIMIZE, (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (win) win.minimize()
+    return true
+  })
+
+  ipcMain.handle(IPC_CHANNELS.WINDOW_MAXIMIZE, (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (win) {
+      if (win.isMaximized()) {
+        win.unmaximize()
+      } else {
+        win.maximize()
+      }
+      return win.isMaximized()
+    }
+    return false
+  })
+
+  ipcMain.handle(IPC_CHANNELS.WINDOW_CLOSE, (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (win) win.close()
+    return true
+  })
+
+  ipcMain.handle(IPC_CHANNELS.WINDOW_IS_MAXIMIZED, (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    return win ? win.isMaximized() : false
+  })
+
   // App Utilities
   ipcMain.handle(IPC_CHANNELS.APP_GET_PATHS, async () => {
     return globalConfigStore.getPaths()

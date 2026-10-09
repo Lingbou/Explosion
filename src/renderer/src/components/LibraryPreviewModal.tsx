@@ -13,7 +13,8 @@ import {
   Sparkles,
   Folder,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  AlertCircle
 } from 'lucide-react'
 import { useLibraryStore } from '../store/libraryStore'
 import { countTextStats } from '../lib/typography'
@@ -82,7 +83,7 @@ export const LibraryPreviewModal: React.FC = () => {
 
   const handleDelete = async (filename: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (window.confirm(`确定要从藏书库中删除书籍《${filename}》吗？`)) {
+    if (window.confirm(`确定要从资料库中删除书籍《${filename}》吗？`)) {
       await deleteBook(filename)
     }
   }
@@ -98,6 +99,15 @@ export const LibraryPreviewModal: React.FC = () => {
     selectedBookFilename && processingFilenames.includes(selectedBookFilename)
   )
 
+  // Safe truncation for massive texts to prevent DOM/V8 crash
+  const MAX_PREVIEW_CHARS = 30000
+  const isTruncated = previewBook ? previewBook.content.length > MAX_PREVIEW_CHARS : false
+  const displayContent = previewBook
+    ? isTruncated
+      ? previewBook.content.slice(0, MAX_PREVIEW_CHARS)
+      : previewBook.content
+    : ''
+
   return (
     <div
       onClick={closeLibraryModal}
@@ -105,14 +115,14 @@ export const LibraryPreviewModal: React.FC = () => {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-5xl h-[85vh] bg-[#fbfbfa] border border-stone-200 rounded-xl shadow-2xl flex flex-col overflow-hidden"
+        className="w-full max-w-5xl h-[85vh] bg-[#fbfbfa] border border-stone-200 rounded-xl shadow-2xl flex flex-col overflow-hidden font-sans"
       >
         {/* Modal Top Header */}
         <div className="h-12 px-5 border-b border-stone-200 bg-white flex items-center justify-between select-none shrink-0">
           <div className="flex items-center gap-2.5">
             <BookOpen className="w-4 h-4 text-stone-700 shrink-0" />
             <span className="font-semibold text-xs text-stone-900">
-              素材藏书库
+              素材资料库
             </span>
             <span className="text-[10px] text-stone-400 font-mono">
               ({books.length} 个分卷/书目)
@@ -163,7 +173,7 @@ export const LibraryPreviewModal: React.FC = () => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="搜索藏书或分卷..."
+                  placeholder="搜索资料或分卷..."
                   className="w-full pl-8 pr-2 py-1 text-xs bg-stone-50 border border-stone-200 rounded-md focus:outline-none focus:border-stone-400 focus:bg-white transition-all text-stone-800 placeholder-stone-400"
                 />
               </div>
@@ -173,7 +183,7 @@ export const LibraryPreviewModal: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-2 space-y-1.5 scrollbar-thin">
               {filteredBooks.length === 0 ? (
                 <div className="p-6 text-center text-xs text-stone-400">
-                  {searchQuery ? '未找到匹配藏书' : '藏书库暂无书籍，点击右上角导入'}
+                  {searchQuery ? '未找到匹配资料' : '资料库暂无书籍，点击右上角导入'}
                 </div>
               ) : (
                 <>
@@ -329,7 +339,7 @@ export const LibraryPreviewModal: React.FC = () => {
                     </span>
                     {stats && (
                       <span className="text-[10px] text-stone-400 font-mono">
-                        · {sizeKb} KB · 约 {stats.chineseChars} 字
+                        · {sizeKb} KB · 全文约 {stats.chineseChars} 字
                       </span>
                     )}
 
@@ -353,8 +363,17 @@ export const LibraryPreviewModal: React.FC = () => {
                 {/* Text Body */}
                 <div className="flex-1 overflow-y-auto px-10 py-8 select-text scrollbar-thin bg-white">
                   <div className="max-w-3xl mx-auto">
+                    {isTruncated && (
+                      <div className="mb-4 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>
+                          超长文献已自动截断前 30,000 字供阅读预览。完整全文（共 {stats?.chineseChars} 汉字）已建立 FTS5 索引供 Agent 后台毫秒级检索。
+                        </span>
+                      </div>
+                    )}
+
                     <pre className="whitespace-pre-wrap font-serif text-sm leading-[2.1] text-stone-900 tracking-wide font-normal">
-                      {previewBook.content}
+                      {displayContent}
                     </pre>
                   </div>
                 </div>

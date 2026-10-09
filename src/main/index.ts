@@ -38,7 +38,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     title: 'Explosion - 现代小说创作工作台',
-    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' } : {}),
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' } : { frame: false }),
     backgroundColor: '#fbfbfa',
     ...(iconPath ? { icon: iconPath } : {}),
     webPreferences: {

@@ -101,7 +101,7 @@ export function searchBooksIndex(
 export const searchLibraryTool: AgentTool = {
   name: 'search_library',
   description:
-    '在素材藏书库中对已拆解索引的书籍（如《九州·缥缈录》）执行高精度自然段全文检索，毫秒级快速定位原著剧情段落、人物名场面、关键对话与设定细节。',
+    '在素材资料库中对已拆解索引的书籍（如《九州·缥缈录》）执行高精度自然段全文检索，毫秒级快速定位原著剧情段落、人物名场面、关键对话与设定细节。',
   parameters: {
     type: 'object',
     properties: {
@@ -132,11 +132,11 @@ export const searchLibraryTool: AgentTool = {
     const matches = searchBooksIndex(cacheBaseDir, q, args.book_name, count)
 
     if (matches.length === 0) {
-      return `藏书库全文检索未命中与 "${q}" 相关的段落。请尝试换用更简短的核心词（如单独搜人名或地名）。`
+      return `资料库全文检索未命中与 "${q}" 相关的段落。请尝试换用更简短的核心词（如单独搜人名或地名）。`
     }
 
     const lines: string[] = [
-      `## 藏书库原著全文检索结果: "${q}" (命中 ${matches.length} 个段落)\n`
+      `## 资料库原著全文检索结果: "${q}" (命中 ${matches.length} 个段落)\n`
     ]
 
     matches.forEach((item, idx) => {

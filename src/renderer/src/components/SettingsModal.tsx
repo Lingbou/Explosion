@@ -290,7 +290,7 @@ export const SettingsModal: React.FC = () => {
           <div>
             <label className="block font-medium text-stone-700 mb-1 flex items-center gap-1.5">
               <Folder className="w-3.5 h-3.5 text-stone-500" />
-              独立素材藏书库路径 (Library)
+              独立素材资料库路径 (Library)
             </label>
             <input
               type="text"

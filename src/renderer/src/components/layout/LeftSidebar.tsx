@@ -671,11 +671,11 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
         <div
           onClick={openLibraryModal}
           className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-stone-100/90 cursor-pointer transition-colors text-xs text-stone-700 border border-transparent hover:border-stone-200"
-          title="点击打开藏书库管理与阅读弹层"
+          title="点击打开资料库管理与阅读弹层"
         >
           <div className="flex items-center gap-2 truncate">
             <BookOpen className="w-3.5 h-3.5 text-stone-600 shrink-0" />
-            <span className="font-medium text-xs text-stone-800">藏书库</span>
+            <span className="font-medium text-xs text-stone-800">资料库</span>
             <span className="text-[10px] text-stone-400 font-mono px-1.5 py-0.2 rounded-full bg-stone-100 border border-stone-200">
               {books.length}
             </span>

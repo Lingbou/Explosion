@@ -157,6 +157,14 @@ export const IPC_CHANNELS = {
   LIBRARY_PROCESSING_STATUS: 'library:processing-status',
   LIBRARY_BOOKS_UPDATED: 'library:books-updated',
 
+    // Window Controls
+  WINDOW_MINIMIZE: 'window:minimize',
+  WINDOW_MAXIMIZE: 'window:maximize',
+  WINDOW_CLOSE: 'window:close',
+  WINDOW_IS_MAXIMIZED: 'window:is-maximized',
+
+
+
   // App Utilities
   APP_GET_PATHS: 'app:get-paths',
   APP_COPY_TEXT: 'app:copy-text'
@@ -239,6 +247,12 @@ export interface ElectronApi {
   onLibraryBooksUpdated: (
     callback: (books: LibraryBook[]) => void
   ) => () => void
+
+  // Window Controls
+  minimizeWindow: () => Promise<boolean>
+  maximizeWindow: () => Promise<boolean>
+  closeWindow: () => Promise<boolean>
+  isWindowMaximized: () => Promise<boolean>
 
   // App Utilities
   getAppPaths: () => Promise<AppPaths>
