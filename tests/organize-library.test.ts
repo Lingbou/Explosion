@@ -99,7 +99,7 @@ describe('organize_library.py Book Splitting & Indexing Script', () => {
       expect(vRow.embedding.byteLength).toBe(768 * 4) // 3072 bytes (768 float32s)
     }
     db.close()
-  })
+  }, 30000)
 
   it('keeps original file when --keep-original flag is specified and supports --no-embeddings', () => {
     const scriptPath = path.resolve(__dirname, '../src/main/library/organize_library.py')

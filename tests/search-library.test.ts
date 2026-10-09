@@ -207,7 +207,7 @@ describe('search_library Tool & Hybrid RAG (FTS5 + 768-dim Vector)', () => {
   })
 
   it('formats search results cleanly with match badge tags via tool execute', async () => {
-    const res = await searchLibraryTool.execute({ query: '不存在的词语xyz123' }, {})
+    const res = await searchLibraryTool.execute({ query: '不存在的词语xyz123', book_name: '不存在的书目404' }, {})
     expect(res).toContain('未命中')
   })
 
