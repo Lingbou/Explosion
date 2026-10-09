@@ -64,3 +64,16 @@ describe('Typography & Chinese Formatting', () => {
     expect(title2).toBe('新会话')
   })
 })
+
+  it('safely and quickly calculates statistics on massive text without OOM', () => {
+    const chunk = '南淮的夏天总是悄无声息，少年拔出铁剑迎着夜色。Hello world 123! '
+    const massive = chunk.repeat(10000) // ~550,000 characters
+
+    const start = performance.now()
+    const stats = countTextStats(massive)
+    const duration = performance.now() - start
+
+    expect(stats.totalChars).toBe(370000)
+    expect(stats.chineseChars).toBe(210000)
+    expect(duration).toBeLessThan(150) // Under 150ms
+  })

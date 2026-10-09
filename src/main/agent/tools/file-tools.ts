@@ -246,7 +246,7 @@ export const listDirTool: AgentTool = {
     properties: {
       path: {
         type: 'string',
-        description: '要列出的目录路径（可选，支持 ~ 波浪号。若留空则同时展示当前小说工程和 ~/.explosion/library/ 藏书库）'
+        description: '要列出的目录路径（可选，支持 ~ 波浪号。若留空则同时展示当前小说工程和 ~/.explosion/library/ 资料库）'
       },
       recursive: {
         type: 'boolean',
@@ -311,11 +311,11 @@ export const listDirTool: AgentTool = {
     }
 
     const libraryDir = path.join(os.homedir(), '.explosion', 'library')
-    results.push(`=== 素材藏书库 (~/.explosion/library) ===`)
+    results.push(`=== 素材资料库 (~/.explosion/library) ===`)
     if (fs.existsSync(libraryDir)) {
       results.push(...listSingle(libraryDir, false))
     } else {
-      results.push('(藏书库目录尚未创建)')
+      results.push('(资料库目录尚未创建)')
     }
 
     const scriptsDir = path.join(os.homedir(), '.explosion', 'scripts')

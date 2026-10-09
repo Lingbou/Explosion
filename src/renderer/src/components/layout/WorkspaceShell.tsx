@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
+import { AppTitleBar } from './AppTitleBar'
 import { LeftSidebar } from './LeftSidebar'
 import { EditorCenter } from './EditorCenter'
 import { RightPanel } from './RightPanel'
@@ -109,29 +110,35 @@ export const WorkspaceShell: React.FC = () => {
   }
 
   return (
-    <div className="h-screen w-screen flex bg-[#fbfbfa] text-stone-900 overflow-hidden font-sans relative">
-      {/* Left Column: Chapters, Project Switcher & Library (Full-height seamless) */}
-      <LeftSidebar width={leftWidth} />
+    <div className="h-screen w-screen flex flex-col bg-[#fbfbfa] text-stone-900 overflow-hidden font-sans relative">
+      {/* Frameless Integrated Custom Titlebar (Replaces OS Titlebar) */}
+      <AppTitleBar />
 
-      {/* Resizer Handle: Left to Center */}
-      <div
-        onMouseDown={handleLeftMouseDown}
-        className="w-1 -ml-0.5 z-20 hover:w-1.5 hover:bg-stone-400 active:bg-stone-600 transition-colors cursor-col-resize bg-transparent shrink-0"
-        title="拖拽调整左侧栏宽度"
-      />
+      {/* Main Three-Column Workspace with Draggable Splitters */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Left Column: Chapters, Project Switcher & Material Library */}
+        <LeftSidebar width={leftWidth} />
 
-      {/* Center Column: Pure-Text Manuscript Editor (Full-height seamless) */}
-      <EditorCenter />
+        {/* Resizer Handle: Left to Center */}
+        <div
+          onMouseDown={handleLeftMouseDown}
+          className="w-1 -ml-0.5 z-20 hover:w-1.5 hover:bg-stone-400 active:bg-stone-600 transition-colors cursor-col-resize bg-transparent shrink-0"
+          title="拖拽调整左侧栏宽度"
+        />
 
-      {/* Resizer Handle: Center to Right */}
-      <div
-        onMouseDown={handleRightMouseDown}
-        className="w-1 -mr-0.5 z-20 hover:w-1.5 hover:bg-stone-400 active:bg-stone-600 transition-colors cursor-col-resize bg-transparent shrink-0"
-        title="拖拽调整助手栏宽度"
-      />
+        {/* Center Column: Pure-Text Manuscript Editor */}
+        <EditorCenter />
 
-      {/* Right Column: Assistant Panel with Integrated Model & Settings (Full-height seamless) */}
-      <RightPanel width={rightWidth} />
+        {/* Resizer Handle: Center to Right */}
+        <div
+          onMouseDown={handleRightMouseDown}
+          className="w-1 -mr-0.5 z-20 hover:w-1.5 hover:bg-stone-400 active:bg-stone-600 transition-colors cursor-col-resize bg-transparent shrink-0"
+          title="拖拽调整助手栏宽度"
+        />
+
+        {/* Right Column: Assistant Collaboration Panel */}
+        <RightPanel width={rightWidth} />
+      </div>
 
       {/* Modal Dialogs */}
       <LibraryPreviewModal />

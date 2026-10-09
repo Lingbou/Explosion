@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Explosion 藏书库大部头物理拆解与 FTS5 全文索引构建器 (Organize Library)
+Explosion 资料库大部头物理拆解与 FTS5 全文索引构建器 (Organize Library)
 用途：
 1. 自动识别 GB18030 / GBK / UTF-8 编码，对大篇幅小说按卷物理拆解；
 2. 自动收敛至专属书名子目录（~/.explosion/library/<书名>/）；
@@ -218,11 +218,11 @@ def migrate_flat_library_files(library_dir: str):
                 print(f"已将 {len(moved_paths)} 个散落分卷收敛整理至专属目录: {book_dir} (并建立 .cache 索引)")
 
 def main():
-    parser = argparse.ArgumentParser(description="Explosion 藏书库物理分卷拆解与 FTS5 全文索引工具")
-    parser.add_argument("target", nargs="?", default=None, help="目标大 TXT 文件路径或藏书库目录")
-    parser.add_argument("--output-dir", "-o", default=None, help="输出文件夹，默认存放于藏书库目录")
+    parser = argparse.ArgumentParser(description="Explosion 资料库物理分卷拆解与 FTS5 全文索引工具")
+    parser.add_argument("target", nargs="?", default=None, help="目标大 TXT 文件路径或资料库目录")
+    parser.add_argument("--output-dir", "-o", default=None, help="输出文件夹，默认存放于资料库目录")
     parser.add_argument("--keep-original", action="store_true", help="拆解完成后保留原始大文件（默认自动清理）")
-    parser.add_argument("--migrate", action="store_true", help="整理藏书库根目录下的散落分卷")
+    parser.add_argument("--migrate", action="store_true", help="整理资料库根目录下的散落分卷")
     args = parser.parse_args()
 
     default_lib = os.path.expanduser("~/.explosion/library")

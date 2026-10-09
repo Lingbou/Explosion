@@ -124,7 +124,7 @@ function formatTraceArgs(toolName: string, args: Record<string, unknown>): strin
     return String(args.url)
   }
   if (toolName === 'list_dir') {
-    return String(args.path || '默认工程与藏书库')
+    return String(args.path || '默认工程与资料库')
   }
   if (args && args.command) {
     return String(args.command)
