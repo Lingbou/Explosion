@@ -17,13 +17,15 @@ import {
   AlertCircle,
   Plus,
   MessageSquare,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react'
 import { useAgentStore, AgentTraceStep } from '../../store/agentStore'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useConfigStore } from '../../store/configStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import { stripMarkdownMarks } from '../../lib/typography'
+import { formatSelectionSnippet } from '../../lib/selection'
 
 interface RightPanelProps {
   width: number
@@ -237,7 +239,11 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
     clearMessages
   } = useAgentStore()
 
-  const { projectPath, chapters, activeChapterId } = useWorkspaceStore()
+  const { projectPath, chapters, activeChapterId, activeDocumentType, activeStoryFile, selectedText, clearSelection } = useWorkspaceStore()
+  const activeChapter = chapters.find((ch) => ch.id === activeChapterId)
+  const isStoryDoc = activeDocumentType === 'story' && activeStoryFile
+  const activeDocFilename = isStoryDoc ? activeStoryFile.relativePath : activeChapter?.relativePath || activeChapter?.filename
+  const activeDocContent = isStoryDoc ? activeStoryFile.content : activeChapter?.content
   const { config, isConfigured, setIsSettingsOpen } = useConfigStore()
   const { books, fetchBooks } = useLibraryStore()
 
@@ -252,8 +258,6 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const activeChapter = chapters.find((ch) => ch.id === activeChapterId)
-
   const currentSession = sessions.find((s) => s.id === activeSessionId) || sessions[0]
   const messages = currentSession?.messages || []
 
@@ -394,9 +398,11 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
     setMentionQuery(null)
     sendTask(textToSend, {
       projectPath,
-      activeChapterFilename: activeChapter?.filename,
-      manuscriptContext: activeChapter?.content
+      activeChapterFilename: activeDocFilename,
+      manuscriptContext: activeDocContent,
+      selectedText
     })
+    clearSelection()
   }
 
   return (
@@ -626,8 +632,32 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area (Clean & Pure with @Mention Popover) */}
+      {/* Input Area (Clean & Pure with @Mention Popover & Selection Capsule) */}
       <div className="p-3 border-t border-stone-200 bg-white shrink-0 relative">
+        {/* Selection Reference Capsule */}
+        {selectedText && (
+          <div className="mb-2 flex items-center justify-between gap-2 px-2.5 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 shadow-2xs animate-in fade-in slide-in-from-bottom-1 duration-150">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <span className="shrink-0 text-xs">🎯</span>
+              <span className="font-medium shrink-0 text-[11px] text-amber-800">针对选中文段:</span>
+              <span className="truncate font-serif text-[11px] text-amber-950/80 italic">
+                "{formatSelectionSnippet(selectedText, 25)}"
+              </span>
+              <span className="shrink-0 text-[10px] text-amber-700 font-mono">
+                ({selectedText.length} 字)
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="p-0.5 rounded hover:bg-amber-200/60 text-amber-600 hover:text-amber-950 transition-colors shrink-0 cursor-pointer"
+              title="取消针对该文段的定向改写"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* @ Mention Popover Menu */}
         {mentionQuery !== null && mentionCandidates.length > 0 && (
           <div className="absolute bottom-full mb-1.5 left-3 right-3 max-h-48 bg-white border border-stone-200 rounded-lg shadow-xl overflow-hidden flex flex-col z-50 text-xs font-sans animate-in fade-in duration-100">
@@ -661,7 +691,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
             value={inputPrompt}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="输入指令，输入 @ 可引用参考资料 (Enter 发送)..."
+            placeholder={selectedText ? '输入修改指令，将精准改写上述选中文段...' : '输入指令，输入 @ 可引用参考资料 (Enter 发送)...'}
             rows={2}
             className="w-full bg-transparent resize-none border-none focus:outline-none text-xs text-stone-900 placeholder-stone-400 px-2 py-1 leading-relaxed max-h-24 scrollbar-thin"
           />
