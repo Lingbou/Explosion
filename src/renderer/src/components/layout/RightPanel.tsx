@@ -29,6 +29,21 @@ interface RightPanelProps {
   width: number
 }
 
+export function cleanVolumeName(filename: string, bookName?: string): string {
+  let name = filename.replace(/\.txt$/i, '').trim()
+  if (bookName) {
+    const cleanB = bookName.replace(/[《》]/g, '').trim()
+    const patterns = [
+      new RegExp(`^《?${cleanB}》?[_\\s-]+`, 'i'),
+      new RegExp(`^《?${bookName}》?[_\\s-]+`, 'i')
+    ]
+    for (const pat of patterns) {
+      name = name.replace(pat, '')
+    }
+  }
+  return name.trim() || filename.replace(/\.txt$/i, '')
+}
+
 function getToolMeta(toolName: string) {
   let normalized = (toolName || '').trim()
 
@@ -265,7 +280,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
     }
   }, [isSessionDropdownOpen])
 
-  // Candidate items for @ Mention
+  // Clean candidate items for @ Mention Popover (Zero .txt extension, zero duplicate book prefixes)
   const mentionCandidates = useMemo(() => {
     if (mentionQuery === null) return []
     const items: Array<{ id: string; label: string; insertText: string; type: 'book' | 'volume' }> = []
@@ -276,14 +291,15 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
         bookNames.add(b.bookName)
         items.push({
           id: `book-${b.bookName}`,
-          label: `《${b.bookName}》 (整本藏书)`,
+          label: `《${b.bookName}》 (全书)`,
           insertText: `@${b.bookName} `,
           type: 'book'
         })
       }
 
-      const label = b.bookName ? `《${b.bookName}》· ${b.filename}` : b.filename
-      const insert = b.bookName ? `@${b.bookName}/${b.filename} ` : `@${b.filename} `
+      const cleanVol = cleanVolumeName(b.filename, b.bookName)
+      const label = b.bookName ? `《${b.bookName}》· ${cleanVol}` : cleanVol
+      const insert = b.bookName ? `@${b.bookName}/${cleanVol} ` : `@${cleanVol} `
       items.push({
         id: `vol-${b.path}`,
         label,
@@ -471,7 +487,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
           {/* Active Model Pill (Full model name, zero premature truncation) */}
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono border border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100 hover:border-stone-300 transition-all shrink-0 whitespace-nowrap"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono border border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100 hover:border-stone-300 transition-all shrink-0 whitespace-nowrap"
             title="点击配置主力模型与服务商"
           >
             <span
@@ -509,7 +525,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
       <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 scrollbar-thin">
         {messages.length === 0 && !isRunning && (
           <div className="h-full flex items-center justify-center text-center p-6 text-stone-400/80 text-xs select-none">
-            在此输入指令或向助手提问，输入 @ 可引用参考藏书...
+            在此输入指令或向助手提问，输入 @ 可引用参考资料...
           </div>
         )}
 
@@ -610,13 +626,13 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area (Clean & Pure with @Mention Book Popover) */}
+      {/* Input Area (Clean & Pure with @Mention Popover) */}
       <div className="p-3 border-t border-stone-200 bg-white shrink-0 relative">
         {/* @ Mention Popover Menu */}
         {mentionQuery !== null && mentionCandidates.length > 0 && (
           <div className="absolute bottom-full mb-1.5 left-3 right-3 max-h-48 bg-white border border-stone-200 rounded-lg shadow-xl overflow-hidden flex flex-col z-50 text-xs font-sans animate-in fade-in duration-100">
             <div className="px-3 py-1.5 border-b border-stone-100 text-[10px] text-stone-400 font-semibold uppercase tracking-wider flex items-center justify-between">
-              <span>引用参考藏书 (@Mention)</span>
+              <span>引用资料库 (@MENTION)</span>
               <span className="font-mono text-[9px]">↑↓ 选择 · 回车插入</span>
             </div>
             <div className="overflow-y-auto p-1 space-y-0.5 scrollbar-thin">
@@ -645,7 +661,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
             value={inputPrompt}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="输入指令，输入 @ 可引用参考藏书 (Enter 发送)..."
+            placeholder="输入指令，输入 @ 可引用参考资料 (Enter 发送)..."
             rows={2}
             className="w-full bg-transparent resize-none border-none focus:outline-none text-xs text-stone-900 placeholder-stone-400 px-2 py-1 leading-relaxed max-h-24 scrollbar-thin"
           />

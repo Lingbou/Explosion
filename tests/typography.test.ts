@@ -1,3 +1,4 @@
+import { cleanVolumeName } from '../src/shared/utils/cleanName'
 import { describe, it, expect } from 'vitest'
 import {
   stripMarkdownMarks,
@@ -77,3 +78,16 @@ describe('Typography & Chinese Formatting', () => {
     expect(stats.chineseChars).toBe(210000)
     expect(duration).toBeLessThan(150) // Under 150ms
   })
+
+describe('cleanVolumeName', () => {
+  it('cleans redundant book names and .txt extensions from volume names', () => {
+    const cleaned1 = cleanVolumeName('《九州·缥缈录》_卷六_豹魂.txt', '九州·缥缈录')
+    expect(cleaned1).toBe('卷六_豹魂')
+
+    const cleaned2 = cleanVolumeName('《九州·缥缈录》_00_序言与简介.txt', '九州·缥缈录')
+    expect(cleaned2).toBe('00_序言与简介')
+
+    const cleaned3 = cleanVolumeName('第一卷.txt')
+    expect(cleaned3).toBe('第一卷')
+  })
+})

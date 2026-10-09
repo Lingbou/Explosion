@@ -392,11 +392,10 @@ export const LibraryPreviewModal: React.FC = () => {
         </div>
 
         {/* Modal Footer */}
-        <div className="h-8 px-5 border-t border-stone-200 bg-stone-50 flex items-center justify-between text-[11px] text-stone-400 font-mono select-none shrink-0">
-          <span>专属书目结构化收敛 · 自动建立段落级 SQLite FTS5 全文索引</span>
+        <div className="h-9 px-5 border-t border-stone-200 bg-stone-50 flex items-center justify-end text-[11px] select-none shrink-0">
           <button
             onClick={closeLibraryModal}
-            className="text-stone-500 hover:text-stone-800 transition-colors"
+            className="px-3.5 py-1 text-xs font-medium text-stone-700 hover:text-stone-900 bg-white border border-stone-200 hover:bg-stone-100 rounded-md transition-colors shadow-2xs"
           >
             完成
           </button>

@@ -1,5 +1,6 @@
 import os from 'os'
 import path from 'path'
+import fs from 'fs'
 
 export interface PromptContextParams {
   projectPath?: string | null
@@ -9,14 +10,109 @@ export interface PromptContextParams {
   referencedBooks?: string[]
 }
 
+export function resolveMentionToLibrary(
+  libraryDir: string,
+  mention: string
+): { name: string; resolvedPath: string | null; bookName: string } {
+  const cleanMention = mention.trim().replace(/^@/, '')
+  const result = { name: cleanMention, resolvedPath: null as string | null, bookName: cleanMention }
+
+  if (!fs.existsSync(libraryDir)) return result
+
+  // 1. Direct path match (file or folder)
+  const direct = path.join(libraryDir, cleanMention)
+  if (fs.existsSync(direct)) {
+    result.resolvedPath = direct
+    return result
+  }
+  if (fs.existsSync(direct + '.txt')) {
+    result.resolvedPath = direct + '.txt'
+    return result
+  }
+
+  // 2. Subpath format: BookName/Volume (e.g. 九州·缥缈录/卷六_豹魂 or 九州·缥缈录/卷六_豹魂.txt)
+  if (cleanMention.includes('/')) {
+    const [bookPart, ...rest] = cleanMention.split('/')
+    const volPart = rest.join('/').replace(/\.txt$/i, '').trim()
+    const cleanBook = bookPart.replace(/[《》]/g, '').trim()
+    result.bookName = cleanBook
+
+    const candidateBookDirs = [path.join(libraryDir, bookPart), path.join(libraryDir, cleanBook)]
+    for (const bDir of candidateBookDirs) {
+      if (fs.existsSync(bDir) && fs.statSync(bDir).isDirectory()) {
+        const files = fs.readdirSync(bDir)
+        for (const f of files) {
+          if (f.endsWith('.txt')) {
+            const fNoExt = f.replace(/\.txt$/i, '').trim()
+            if (f.includes(volPart) || fNoExt.includes(volPart) || volPart.includes(fNoExt)) {
+              result.resolvedPath = path.join(bDir, f)
+              return result
+            }
+          }
+        }
+      }
+    }
+  } else {
+    // 3. Single book name or volume
+    const cleanBook = cleanMention.replace(/[《》]/g, '').trim()
+    result.bookName = cleanBook
+    const bookDir = path.join(libraryDir, cleanBook)
+    if (fs.existsSync(bookDir)) {
+      result.resolvedPath = bookDir
+      return result
+    }
+
+    const entries = fs.readdirSync(libraryDir)
+    for (const entry of entries) {
+      const full = path.join(libraryDir, entry)
+      if (fs.statSync(full).isDirectory()) {
+        const subFiles = fs.readdirSync(full)
+        for (const sf of subFiles) {
+          if (sf.includes(cleanMention)) {
+            result.resolvedPath = path.join(full, sf)
+            result.bookName = entry
+            return result
+          }
+        }
+      }
+    }
+  }
+
+  return result
+}
+
 export function buildAgentSystemPrompt(params: PromptContextParams): string {
   const libraryDir = params.libraryPath || path.join(os.homedir(), '.explosion', 'library')
   const scriptsDir = path.join(os.homedir(), '.explosion', 'scripts')
   const storyDir = params.projectPath ? path.join(params.projectPath, 'story') : null
 
-  const mentionsPrompt = params.referencedBooks && params.referencedBooks.length > 0
-    ? `\n---\n### 【作者 @ 显式引用的参考藏书】:\n作者在当前指令中使用了 @ 显式指定参考书目: ${params.referencedBooks.join('、')}。\n- 你必须优先调阅并参考该书目！\n- 你可以直接调用 \`search_library(query, "${params.referencedBooks[0]}")\` 在该书的自然段 FTS5 索引中毫秒级检索原著对应名场面、对话或设定细节；\n- 亦可调用 \`read_file\` 查看整卷文件。\n`
-    : ''
+  let mentionsPrompt = ''
+  if (params.referencedBooks && params.referencedBooks.length > 0) {
+    const resolvedItems = params.referencedBooks.map((ref) =>
+      resolveMentionToLibrary(libraryDir, ref)
+    )
+
+    const lines: string[] = [
+      '\n---',
+      '### 【作者 @ 显式引用的参考资料】:',
+      '作者在当前任务指令中使用了 @ 显式指定参考资料:'
+    ]
+
+    for (const item of resolvedItems) {
+      if (item.resolvedPath) {
+        lines.push(`- 引用项: @${item.name}`)
+        lines.push(`  - 本地真实路径: ${item.resolvedPath}`)
+        lines.push(`  - 归属书目: ${item.bookName}`)
+        lines.push(`  - 你可以直接调用 search_library(query, "${item.bookName}") 毫秒级全文检索该书原著段落；`)
+        lines.push(`  - 亦可调用 read_file("${item.resolvedPath}") 直接阅读整篇内容。`)
+      } else {
+        lines.push(`- 引用书目: @${item.name}`)
+        lines.push(`  - 你可以直接调用 search_library(query, "${item.bookName}") 进行高精度全文检索。`)
+      }
+    }
+
+    mentionsPrompt = lines.join('\n') + '\n'
+  }
 
   return `你是由 Explosion 驱动的自主小说创作与文学考据智能体（Explosion）。
 你直接运行在作者本地操作系统的 Electron 主进程中，被授予了真实的操作系统终端执行权、磁盘文件读写编辑权、资料库 FTS5 高精度全文检索与 AnySearch 实时联网搜索能力。
