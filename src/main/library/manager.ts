@@ -1,5 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
+import * as os from 'os'
 import { exec } from 'child_process'
 import { BrowserWindow, dialog, shell } from 'electron'
 import { IPC_CHANNELS, LibraryBook, LibraryBookContent } from '../../shared/types/ipc'
@@ -151,6 +152,33 @@ export class LibraryManager {
     }
   }
 
+  private ensureScriptInstalled(): string | null {
+    const scriptsDir = this.configStore.getPaths().scriptsDir
+    const dest = path.join(scriptsDir, 'organize_library.py')
+    const candidates = [
+      path.resolve(__dirname, 'organize_library.py'),
+      path.resolve(__dirname, '../library/organize_library.py'),
+      path.resolve(process.cwd(), 'src/main/library/organize_library.py')
+    ]
+
+    for (const cand of candidates) {
+      if (fs.existsSync(cand) && cand !== dest) {
+        try {
+          if (!fs.existsSync(scriptsDir)) {
+            fs.mkdirSync(scriptsDir, { recursive: true })
+          }
+          fs.copyFileSync(cand, dest)
+          fs.chmodSync(dest, 0o755)
+        } catch {
+          // ignore copy error
+        }
+        return dest
+      }
+    }
+
+    return fs.existsSync(dest) ? dest : null
+  }
+
   public async processLibraryFile(filename: string): Promise<boolean> {
     const libPath = this.getLibraryPath()
     let filePath = path.join(libPath, filename)
@@ -165,15 +193,15 @@ export class LibraryManager {
     this.processingFilenames.add(filename)
     this.broadcastProcessingStatus()
 
-    // Find script: check ~/.explosion/scripts/organize_library.py or bundled
-    const pythonScript = path.join(this.configStore.getPaths().scriptsDir, 'organize_library.py')
+    const installedScript = this.ensureScriptInstalled()
+    const pythonScript = path.join(this.configStore.getPaths().scriptsDir, "organize_library.py")
     const candidates = [
+      installedScript,
       pythonScript,
-      path.resolve(__dirname, 'organize_library.py'),
-      path.resolve(__dirname, '../library/organize_library.py'),
-      path.resolve(process.cwd(), 'src/main/library/organize_library.py')
-    ]
-
+      path.resolve(__dirname, "organize_library.py"),
+      path.resolve(__dirname, "../library/organize_library.py"),
+      path.resolve(process.cwd(), "src/main/library/organize_library.py")
+    ].filter(Boolean) as string[]
     let scriptPath = ''
     for (const cand of candidates) {
       if (fs.existsSync(cand)) {
@@ -189,7 +217,11 @@ export class LibraryManager {
     }
 
     return new Promise<boolean>((resolve) => {
-      exec(`python3 "${scriptPath}" "${filePath}" --output-dir "${libPath}"`, (_err) => {
+    const venvPython3 = path.join(os.homedir(), ".explosion", ".venv", "bin", "python3")
+    const pyBin = (process.env.EXPLOSION_PYTHON_BIN && fs.existsSync(process.env.EXPLOSION_PYTHON_BIN))
+      ? process.env.EXPLOSION_PYTHON_BIN
+      : (fs.existsSync(venvPython3) ? venvPython3 : "python3")
+      exec(`"${pyBin}" "${scriptPath}" "${filePath}" --output-dir "${libPath}"`, (_err) => {
         this.processingFilenames.delete(filename)
         this.broadcastProcessingStatus()
         this.broadcastBooksUpdated()
