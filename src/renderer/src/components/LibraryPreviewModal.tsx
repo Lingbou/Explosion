@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import {
   X,
   BookOpen,
@@ -34,23 +34,24 @@ export const LibraryPreviewModal: React.FC = () => {
     processingFilenames
   } = useLibraryStore()
 
+  // All React Hooks MUST be called unconditionally at the top of the component!
   const [copied, setCopied] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [openBookFolders, setOpenBookFolders] = useState<Record<string, boolean>>({})
 
-  if (!isLibraryModalOpen) return null
-
-  const filteredBooks = books.filter((b) => {
+  const filteredBooks = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
-    if (!q) return true
-    return (
-      b.filename.toLowerCase().includes(q) ||
-      (b.bookName && b.bookName.toLowerCase().includes(q))
-    )
-  })
+    if (!q) return books
+    return books.filter((b) => {
+      return (
+        b.filename.toLowerCase().includes(q) ||
+        (b.bookName && b.bookName.toLowerCase().includes(q))
+      )
+    })
+  }, [books, searchQuery])
 
-  // Group books by bookName
-  const groupedBooks = React.useMemo(() => {
+  // Group books by bookName unconditionally via useMemo
+  const groupedBooks = useMemo(() => {
     const groups: { [key: string]: typeof books } = {}
     const standalone: typeof books = []
 
@@ -64,6 +65,9 @@ export const LibraryPreviewModal: React.FC = () => {
     }
     return { groups, standalone }
   }, [filteredBooks])
+
+  // Early return is placed strictly AFTER all Hooks!
+  if (!isLibraryModalOpen) return null
 
   const toggleBookFolder = (bookName: string) => {
     setOpenBookFolders((prev) => ({
