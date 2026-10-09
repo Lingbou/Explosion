@@ -17,6 +17,7 @@ vi.mock('electron', () => ({
 }))
 
 import { AgentRunner, resolveToolCallIntent } from '../src/main/agent/runner'
+import { buildAgentSystemPrompt } from '../src/main/agent/prompts'
 import { ConfigStore } from '../src/main/config/store'
 import { LLMAdapter } from '../src/main/llm/adapter'
 import { AgentStreamEvent } from '../src/shared/types/ipc'
@@ -263,4 +264,119 @@ describe('AgentRunner Autonomous Loop', () => {
     const hasErrorOrAborted = events.some((e) => e.type === 'error' && e.error?.includes('终止'))
     expect(hasErrorOrAborted).toBe(true)
   })
-})
+  it('assembles surgical instructions when selectedText is provided to buildAgentSystemPrompt', () => {
+    const prompt = buildAgentSystemPrompt({
+      projectPath: '/mock/project',
+      activeChapterFilename: 'manuscript/001-第一章.txt',
+      selectedText: '他握紧了手中的长刀，目光如炬。'
+    })
+
+    expect(prompt).toContain('【作者当前定向选中的目标文段】:')
+    expect(prompt).toContain('「他握紧了手中的长刀，目光如炬。」')
+    expect(prompt).toContain('你必须且仅使用 `edit_file` 工具将上述目标文段精准替换为优化改写后的内容')
+    expect(prompt).toContain('绝对严禁随意篡改或覆写其他未选中的上下文段落！')
+    expect(prompt).toContain('- 作者定向选中的目标文段: 「他握紧了手中的长刀，目光如炬。」')
+  })
+
+  it('executes targeted surgical rewrite with edit_file when selectedText is provided', async () => {
+    // Write a manuscript file with 3 paragraphs
+    const chapterDir = path.join(tempSandboxDir, 'manuscript')
+    fs.mkdirSync(chapterDir, { recursive: true })
+    const initialContent = '第一段：夜幕低垂，寒风萧瑟。\n\n第二段：少年握着锈迹斑斑的长剑，站在风中瑟瑟发抖。\n\n第三段：远处的城门缓缓关闭。'
+    const targetFilePath = path.join(chapterDir, '001-第一章.txt')
+    fs.writeFileSync(targetFilePath, initialContent, 'utf-8')
+
+    const targetSelection = '少年握着锈迹斑斑的长剑，站在风中瑟瑟发抖。'
+    const rewrittenSelection = '少年反手扣紧青黑色的重剑，冷冽的雨水顺着剑锋无声滑落。'
+
+    let callCount = 0
+    let capturedMessages: any[] = []
+
+    const mockLLMAdapter = {
+      generateStream: vi.fn().mockImplementation(async (options, requestId, onChunk) => {
+        callCount++
+        capturedMessages = options.messages
+        if (callCount === 1) {
+          // Agent calls edit_file tool targeting exact selected segment
+          const toolCall = {
+            id: 'call-edit-selection-1',
+            type: 'function' as const,
+            name: 'edit_file',
+            arguments: JSON.stringify({
+              path: 'manuscript/001-第一章.txt',
+              old_str: targetSelection,
+              new_str: rewrittenSelection
+            })
+          }
+          onChunk({
+            requestId,
+            delta: '',
+            done: true,
+            toolCalls: [toolCall]
+          })
+          return {
+            text: '',
+            model: 'mock-model',
+            toolCalls: [toolCall]
+          }
+        } else {
+          onChunk({
+            requestId,
+            delta: '已精准改写选中文段，其余段落完好无损。',
+            done: true
+          })
+          return {
+            text: '已精准改写选中文段，其余段落完好无损。',
+            model: 'mock-model'
+          }
+        }
+      })
+    } as unknown as LLMAdapter
+
+    const runner = new AgentRunner({
+      llmAdapter: mockLLMAdapter,
+      configStore: testConfigStore,
+      maxTurns: 5
+    })
+
+    const events: AgentStreamEvent[] = []
+    await runner.runTask(
+      'task-selection-rewrite-test',
+      {
+        userPrompt: '把这句动作写得更有压迫感一点',
+        projectPath: tempSandboxDir,
+        activeChapterFilename: 'manuscript/001-第一章.txt',
+        manuscriptContext: initialContent,
+        selectedText: targetSelection
+      },
+      (ev) => {
+        events.push(ev)
+      }
+    )
+
+    expect(callCount).toBe(2)
+
+    // Verify user message contained targeted selection
+    const userMsg = capturedMessages.find((m) => m.role === 'user')
+    expect(userMsg.content).toContain('【作者当前定向选中的目标文段】:')
+    expect(userMsg.content).toContain(targetSelection)
+    expect(userMsg.content).toContain('把这句动作写得更有压迫感一点')
+
+    // Verify system message contained strict surgical rule
+    const sysMsg = capturedMessages.find((m) => m.role === 'system')
+    expect(sysMsg.content).toContain('【作者当前定向选中的目标文段】:')
+    expect(sysMsg.content).toContain('你必须且仅使用 `edit_file` 工具将上述目标文段精准替换')
+
+    // Verify file on disk: paragraph 1 and 3 are 100% UNTOUCHED, paragraph 2 is surgically replaced!
+    const finalContent = fs.readFileSync(targetFilePath, 'utf-8')
+    expect(finalContent).toContain('第一段：夜幕低垂，寒风萧瑟。')
+    expect(finalContent).toContain(rewrittenSelection)
+    expect(finalContent).toContain('第三段：远处的城门缓缓关闭。')
+    expect(finalContent).not.toContain(targetSelection)
+
+    // Verify tool execution succeeded
+    const toolResult = events.find((e) => e.type === 'tool_result')
+    expect(toolResult?.toolResult?.name).toBe('edit_file')
+    expect(toolResult?.toolResult?.result).toContain('已成功在文件')
+  })
+});

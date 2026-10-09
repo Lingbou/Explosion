@@ -164,7 +164,8 @@ export class AgentRunner {
       activeChapterFilename: taskOptions.activeChapterFilename,
       manuscriptContext: taskOptions.manuscriptContext,
       libraryPath: config.workspace.libraryPath,
-      referencedBooks
+      referencedBooks,
+      selectedText: taskOptions.selectedText
     })
 
     const messages: LLMMessage[] = [
@@ -175,14 +176,24 @@ export class AgentRunner {
     ]
 
     if (taskOptions.manuscriptContext?.trim()) {
+      let userContent = `【当前正在编辑的手稿参考】:\n${taskOptions.manuscriptContext.slice(0, 4000)}\n\n`
+      if (taskOptions.selectedText?.trim()) {
+        userContent += `【作者当前定向选中的目标文段】:\n「${taskOptions.selectedText.trim()}」\n\n`
+      }
+      userContent += `【用户指令】:\n${taskOptions.userPrompt.trim()}`
       messages.push({
         role: 'user',
-        content: `【当前正在编辑的手稿参考】:\n${taskOptions.manuscriptContext.slice(0, 4000)}\n\n【用户指令】:\n${taskOptions.userPrompt.trim()}`
+        content: userContent
       })
     } else {
+      let userContent = ''
+      if (taskOptions.selectedText?.trim()) {
+        userContent += `【作者当前定向选中的目标文段】:\n「${taskOptions.selectedText.trim()}」\n\n`
+      }
+      userContent += taskOptions.userPrompt.trim()
       messages.push({
         role: 'user',
-        content: taskOptions.userPrompt.trim()
+        content: userContent
       })
     }
 

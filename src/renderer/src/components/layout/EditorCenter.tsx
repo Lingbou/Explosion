@@ -32,7 +32,10 @@ export const EditorCenter: React.FC = () => {
     saveActiveDocument,
     openProject,
     createProject,
-    addChapter
+    addChapter,
+    selectedText,
+    setSelection,
+    clearSelection
   } = useWorkspaceStore()
 
   const [copied, setCopied] = useState(false)
@@ -49,6 +52,23 @@ export const EditorCenter: React.FC = () => {
 
   const stats = countTextStats(currentContent)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleSelectionChange = () => {
+    const el = textareaRef.current
+    if (!el) return
+    const start = el.selectionStart
+    const end = el.selectionEnd
+    if (typeof start === "number" && typeof end === "number" && end > start) {
+      const text = el.value.substring(start, end)
+      if (text.length >= 2) {
+        setSelection(text, { start, end })
+        return
+      }
+    }
+    if (useWorkspaceStore.getState().selectedText !== null) {
+      clearSelection()
+    }
+  }
 
   // Auto-save debounce effect
   useEffect(() => {
@@ -225,6 +245,9 @@ export const EditorCenter: React.FC = () => {
           ref={textareaRef}
           value={currentContent}
           onChange={(e) => updateContent(e.target.value)}
+          onSelect={handleSelectionChange}
+          onMouseUp={handleSelectionChange}
+          onKeyUp={handleSelectionChange}
           placeholder="在此开始写作..."
           spellCheck={false}
           className="w-full h-full bg-transparent resize-none overflow-y-auto scrollbar-thin border-none focus:outline-none text-stone-900 placeholder-stone-300 text-base leading-[2.1] font-serif tracking-wide select-text block"
@@ -248,6 +271,11 @@ export const EditorCenter: React.FC = () => {
           <span>
             总字数: <strong className="text-stone-800 font-normal">{stats.totalChars}</strong>
           </span>
+          {selectedText && (
+            <span className="text-amber-800">
+              已选中: <strong className="text-amber-900 font-normal">{selectedText.length}</strong> 字
+            </span>
+          )}
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3 text-stone-400" />
             预计阅读: <strong className="text-stone-800 font-normal">{stats.readingMinutes} 分钟</strong>

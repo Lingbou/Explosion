@@ -23,6 +23,7 @@ export interface AgentMessage {
   content: string
   thinking?: string
   traces?: AgentTraceStep[]
+  selectedText?: string
   timestamp: number
 }
 
@@ -55,6 +56,7 @@ interface AgentState {
       projectPath?: string | null
       activeChapterFilename?: string | null
       manuscriptContext?: string
+      selectedText?: string | null
     }
   ) => Promise<void>
   abortTask: () => void
@@ -262,6 +264,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       id: `msg-${Date.now()}-u`,
       role: 'user',
       content: prompt.trim(),
+      selectedText: contextParams.selectedText?.trim() || undefined,
       timestamp: Date.now()
     }
 
@@ -285,7 +288,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       userPrompt: prompt.trim(),
       projectPath: contextParams.projectPath,
       activeChapterFilename: contextParams.activeChapterFilename,
-      manuscriptContext: contextParams.manuscriptContext
+      manuscriptContext: contextParams.manuscriptContext,
+      selectedText: contextParams.selectedText
     }
 
     let accumulatedDelta = ''

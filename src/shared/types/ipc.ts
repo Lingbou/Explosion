@@ -74,6 +74,7 @@ export interface AgentTaskOptions {
   projectPath?: string | null
   activeChapterFilename?: string | null
   manuscriptContext?: string
+  selectedText?: string | null
 }
 
 export interface AgentToolCallInfo {
