@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { formatChineseManuscript } from '../lib/typography'
+import { validateSelection } from '../lib/selection'
 import { getNextChapterTitle } from '../../../shared/utils/chineseNumerals'
 import { ProjectChapterFile, StoryBibleData, StoryBibleFile } from '../../../shared/types/ipc'
 
@@ -18,6 +19,12 @@ interface WorkspaceState {
 
   isDirty: boolean
   lastSavedAt: number | null
+
+  // Selection Perception
+  selectedText: string | null
+  selectionRange: { start: number; end: number } | null
+  setSelection: (text: string | null, range: { start: number; end: number } | null) => void
+  clearSelection: () => void
 
   initWorkspace: (lastProjectPath?: string | null) => Promise<void>
   openProject: () => Promise<void>
@@ -64,6 +71,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   activeStoryFile: null,
   isDirty: false,
   lastSavedAt: null,
+  selectedText: null,
+  selectionRange: null,
 
   initWorkspace: async (lastProjectPath?: string | null) => {
     // Setup Live File Sync listener once
@@ -83,7 +92,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
                 updatedAt: Date.now()
               },
               isDirty: false,
-              lastSavedAt: Date.now()
+              lastSavedAt: Date.now(),
+              selectedText: null,
+              selectionRange: null
             })
           }
           state.loadProjectByPath(projectPath)
@@ -98,7 +109,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               ? { ...ch, content: content ?? ch.content, updatedAt: Date.now() }
               : ch
           )
-          set({ chapters: updated, isDirty: false, lastSavedAt: Date.now() })
+          set({ chapters: updated, isDirty: false, lastSavedAt: Date.now(), selectedText: null, selectionRange: null })
         } else {
           // New chapter file created on disk, reload project list
           state.loadProjectByPath(projectPath)
@@ -150,7 +161,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           activeChapterId: data.activeChapterId || data.chapters[0].id,
           storyBible: data.storyBible || null,
           isDirty: false,
-          lastSavedAt: Date.now()
+          lastSavedAt: Date.now(),
+          selectedText: null,
+          selectionRange: null
         })
       }
     } catch {
@@ -173,7 +186,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       activeDocumentType: 'chapter',
       activeStoryFile: null,
       isDirty: false,
-      lastSavedAt: null
+      lastSavedAt: null,
+      selectedText: null,
+      selectionRange: null
     })
   },
 
@@ -191,7 +206,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       activeDocumentType: 'chapter',
       activeChapterId: id,
       activeStoryFile: null,
-      isDirty: false
+      isDirty: false,
+      selectedText: null,
+      selectionRange: null
     })
   },
 
@@ -200,7 +217,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({
       activeDocumentType: 'story',
       activeStoryFile: file,
-      isDirty: false
+      isDirty: false,
+      selectedText: null,
+      selectionRange: null
     })
   },
 
@@ -498,6 +517,33 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   saveActiveChapter: async () => {
     return get().saveActiveDocument()
+  },
+
+  setSelection: (text: string | null, range: { start: number; end: number } | null) => {
+    const validated = validateSelection(text, range)
+    if (validated) {
+      const current = get()
+      if (
+        current.selectedText === validated.selectedText &&
+        current.selectionRange?.start === validated.selectionRange.start &&
+        current.selectionRange?.end === validated.selectionRange.end
+      ) {
+        return
+      }
+      set({ selectedText: validated.selectedText, selectionRange: validated.selectionRange })
+    } else {
+      const current = get()
+      if (current.selectedText !== null || current.selectionRange !== null) {
+        set({ selectedText: null, selectionRange: null })
+      }
+    }
+  },
+
+  clearSelection: () => {
+    const current = get()
+    if (current.selectedText !== null || current.selectionRange !== null) {
+      set({ selectedText: null, selectionRange: null })
+    }
   },
 
   insertText: (text: string) => {

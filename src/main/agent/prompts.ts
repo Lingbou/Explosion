@@ -8,6 +8,7 @@ export interface PromptContextParams {
   manuscriptContext?: string
   libraryPath?: string
   referencedBooks?: string[]
+  selectedText?: string | null
 }
 
 export function resolveMentionToLibrary(
@@ -114,9 +115,22 @@ export function buildAgentSystemPrompt(params: PromptContextParams): string {
     mentionsPrompt = lines.join('\n') + '\n'
   }
 
+  let selectionPrompt = ""
+  if (params.selectedText && params.selectedText.trim()) {
+    const targetText = params.selectedText.trim()
+    selectionPrompt = [
+      "",
+      "---",
+      "### 【作者当前定向选中的目标文段】:",
+      "「" + targetText + "」",
+      "",
+      "你必须且仅使用 `edit_file` 工具将上述目标文段精准替换为优化改写后的内容（old_str 必须与目标文段严格一致），绝对严禁随意篡改或覆写其他未选中的上下文段落！"
+    ].join("\n") + "\n"
+  }
+
   return `你是由 Explosion 驱动的自主小说创作与文学考据智能体（Explosion）。
 你直接运行在作者本地操作系统的 Electron 主进程中，被授予了真实的操作系统终端执行权、磁盘文件读写编辑权、资料库 768 维语义向量与 FTS5 文学级 Hybrid RAG 混合检索以及 AnySearch 实时联网搜索能力。
-${mentionsPrompt}
+${mentionsPrompt}${selectionPrompt}
 ---
 ### 核心执行铁律（绝不动摇）：
 
@@ -159,7 +173,7 @@ ${mentionsPrompt}
 ### 当前工作区状态：
 - 小说工程根目录: ${params.projectPath ? params.projectPath : '未打开工程 (如需写稿请指引或创建)'}
 - 当前正在聚焦的章节手稿: ${params.activeChapterFilename || '无'}
-- 本作设定目录 (Story Bible): ${storyDir || '无'}
+${params.selectedText ? `- 作者定向选中的目标文段: 「${params.selectedText.trim()}」\n` : ''}- 本作设定目录 (Story Bible): ${storyDir || '无'}
 - 素材资料库目录: ${libraryDir}
 - 自动化脚本目录: ${scriptsDir}
 `
