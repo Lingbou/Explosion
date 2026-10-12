@@ -169,7 +169,7 @@ export const OnboardingModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-      <div className="w-full max-w-xl bg-white border border-stone-200 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="w-full max-w-xl bg-white dark:bg-[#1f1e1c] border border-stone-200 dark:border-stone-800 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="p-6 pb-4 border-b border-stone-200">
           <div className="flex items-center gap-3">
@@ -226,7 +226,7 @@ export const OnboardingModal: React.FC = () => {
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
                 placeholder="https://api.example.com/v1"
-                className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 font-mono text-stone-900 placeholder-stone-400 focus:outline-none focus:border-stone-800"
+                className="w-full bg-white dark:bg-[#181716] border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2 font-mono text-stone-900 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-600 focus:outline-none focus:border-stone-800 dark:focus:border-stone-400"
               />
             </div>
             <div>
@@ -236,7 +236,7 @@ export const OnboardingModal: React.FC = () => {
               <select
                 value={protocol}
                 onChange={(e) => setProtocol(e.target.value as LLMProtocol)}
-                className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:border-stone-800"
+                className="w-full bg-white dark:bg-[#181716] border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-800 dark:focus:border-stone-400"
               >
                 <option value="chat_completions">Chat Completions</option>
                 <option value="openai_responses">OpenAI Responses</option>
@@ -271,7 +271,7 @@ export const OnboardingModal: React.FC = () => {
                   setIsApiKeyModified(true)
                 }}
                 placeholder={currentPreset.apiKeyPlaceholder}
-                className="w-full bg-white border border-stone-200 rounded-lg pl-3 pr-10 py-2 font-mono text-stone-900 placeholder-stone-400 focus:outline-none focus:border-stone-800"
+                className="w-full bg-white dark:bg-[#181716] border border-stone-200 dark:border-stone-700 rounded-lg pl-3 pr-10 py-2 font-mono text-stone-900 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-600 focus:outline-none focus:border-stone-800 dark:focus:border-stone-400"
               />
               <button
                 type="button"
@@ -334,7 +334,7 @@ export const OnboardingModal: React.FC = () => {
             type="button"
             onClick={handleTestConnection}
             disabled={isTesting || !baseUrl}
-            className="px-3 py-1.5 rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 hover:text-stone-900 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#242220] text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100 transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
           >
             <Zap className="w-3.5 h-3.5 text-stone-600" />
             {isTesting ? '正在测试...' : '测试连通性'}

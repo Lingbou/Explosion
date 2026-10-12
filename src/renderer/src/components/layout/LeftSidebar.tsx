@@ -377,8 +377,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
         onDoubleClick={(e) => handleStartRename(ch.id, ch.title, e)}
         className={`group relative flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition-all ${
           isActive
-            ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/60'
-            : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
+            ? 'bg-white dark:bg-[#252321] text-stone-900 dark:text-stone-100 font-medium shadow-2xs border border-stone-200/60 dark:border-stone-700'
+            : 'text-stone-600 dark:text-stone-400 hover:bg-stone-200/50 dark:hover:bg-stone-800/60 hover:text-stone-900 dark:hover:text-stone-100'
         } ${isDropBefore ? 'border-t-2 border-stone-800' : ''} ${
           isDropAfter ? 'border-b-2 border-stone-800' : ''
         } ${opts?.isInsideVolume ? 'ml-3' : ''}`}
@@ -402,7 +402,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
               }}
               autoFocus
               onClick={(e) => e.stopPropagation()}
-              className="bg-white border border-stone-400 rounded px-1 text-xs text-stone-900 w-full focus:outline-none"
+              className="bg-white dark:bg-[#181716] border border-stone-400 dark:border-stone-600 rounded px-1 text-xs text-stone-900 dark:text-stone-100 w-full focus:outline-none"
             />
           ) : (
             <span className="truncate">{ch.title || `第 ${index + 1} 章`}</span>
@@ -714,7 +714,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                               }}
                               autoFocus
                               onClick={(e) => e.stopPropagation()}
-                              className="bg-white border border-stone-400 rounded px-1 text-xs text-stone-900 w-full focus:outline-none"
+                              className="bg-white dark:bg-[#181716] border border-stone-400 dark:border-stone-600 rounded px-1 text-xs text-stone-900 dark:text-stone-100 w-full focus:outline-none"
                             />
                           ) : (
                             <span
@@ -823,20 +823,20 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
         {/* Content Protection Modal for Volume Deletion */}
         {volumeToDelete && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-100 font-sans">
-            <div className="bg-white rounded-xl shadow-2xl border border-stone-200 max-w-sm w-full p-4.5 space-y-3.5">
+            <div className="bg-white dark:bg-[#1f1e1c] rounded-xl shadow-2xl border border-stone-200 dark:border-stone-800 max-w-sm w-full p-4.5 space-y-3.5">
               <div className="flex items-start gap-3">
-                <div className="p-2 rounded-full bg-amber-50 text-amber-600 shrink-0">
+                <div className="p-2 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shrink-0">
                   <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-stone-900">
+                  <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
                     删除分卷《{volumeToDelete.name}》
                   </h3>
-                  <p className="text-xs text-stone-500 mt-1 leading-relaxed">
+                  <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 leading-relaxed">
                     {volumeToDelete.count > 0 ? (
                       <>
                         该卷下包含{' '}
-                        <span className="font-semibold text-stone-800">
+                        <span className="font-semibold text-stone-800 dark:text-stone-200">
                           {volumeToDelete.count}
                         </span>{' '}
                         个章节手稿。为保障小说内容安全，请选择删除方式：
@@ -853,7 +853,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                   <>
                     <button
                       onClick={() => handleConfirmDeleteVolume(true)}
-                      className="w-full py-2 px-3 rounded-lg bg-stone-900 text-white text-xs font-medium hover:bg-stone-800 flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                      className="w-full py-2 px-3 rounded-lg bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 text-xs font-medium hover:bg-stone-800 dark:hover:bg-white flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
                     >
                       <span>保留手稿并删除卷 (推荐)</span>
                     </button>
