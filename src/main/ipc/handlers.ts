@@ -6,7 +6,7 @@ import {
   LLMGenerateOptions,
   TestConnectionParams
 } from '../../shared/types/llm'
-import { globalConfigStore } from '../config/store'
+import { globalConfigStore, isMaskedApiKey } from '../config/store'
 import { globalLLMAdapter } from '../llm/adapter'
 import { globalProjectManager } from '../project/manager'
 import { globalLibraryManager } from '../library/manager'
@@ -16,25 +16,40 @@ import { globalSnapshotManager } from '../project/snapshot-manager'
 export function registerIpcHandlers(): void {
   // Config Handlers
   ipcMain.handle(IPC_CHANNELS.CONFIG_GET, async () => {
-    return globalConfigStore.getConfig()
+    return globalConfigStore.getSanitizedConfig()
   })
 
   ipcMain.handle(IPC_CHANNELS.CONFIG_SAVE, async (_event, config: AppConfig) => {
-    const saved = globalConfigStore.saveConfig(config)
-    return { success: true, config: saved }
+    globalConfigStore.saveConfig(config)
+    return { success: true, config: globalConfigStore.getSanitizedConfig() }
   })
 
   ipcMain.handle(IPC_CHANNELS.CONFIG_RESET, async () => {
-    return globalConfigStore.resetConfig()
+    globalConfigStore.resetConfig()
+    return globalConfigStore.getSanitizedConfig()
   })
 
   // LLM Handlers
   ipcMain.handle(IPC_CHANNELS.LLM_TEST_CONNECTION, async (_event, params: TestConnectionParams) => {
-    return globalLLMAdapter.testConnection(params)
+    const effectiveApiKey =
+      params.apiKey && !isMaskedApiKey(params.apiKey)
+        ? params.apiKey
+        : globalConfigStore.getConfig().provider.apiKey
+    return globalLLMAdapter.testConnection({
+      ...params,
+      apiKey: effectiveApiKey
+    })
   })
 
   ipcMain.handle(IPC_CHANNELS.LLM_FETCH_MODELS, async (_event, params: FetchModelsParams) => {
-    return globalLLMAdapter.fetchModels(params)
+    const effectiveApiKey =
+      params.apiKey && !isMaskedApiKey(params.apiKey)
+        ? params.apiKey
+        : globalConfigStore.getConfig().provider.apiKey
+    return globalLLMAdapter.fetchModels({
+      ...params,
+      apiKey: effectiveApiKey
+    })
   })
 
   ipcMain.handle(IPC_CHANNELS.LLM_GENERATE, async (_event, params: LLMGenerateOptions) => {

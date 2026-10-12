@@ -20,6 +20,7 @@ export const OnboardingModal: React.FC = () => {
   const [presetId, setPresetId] = useState<ProviderPresetId>(config.provider.presetId || 'deepseek')
   const [baseUrl, setBaseUrl] = useState(config.provider.baseUrl || 'https://api.deepseek.com')
   const [apiKey, setApiKey] = useState(config.provider.apiKey || '')
+  const [isApiKeyModified, setIsApiKeyModified] = useState(false)
   const [protocol, setProtocol] = useState<LLMProtocol>(config.provider.protocol || 'chat_completions')
   const [activeModel, setActiveModel] = useState(config.provider.activeModel || 'deepseek-chat')
   const [models, setModels] = useState<string[]>(
@@ -46,6 +47,14 @@ export const OnboardingModal: React.FC = () => {
     setModels(preset.defaultModels)
     setActiveModel(preset.recommendedModel || preset.defaultModels[0] || '')
     setTestResult(null)
+
+    if (id === config.provider.presetId) {
+      setApiKey(config.provider.apiKey || '')
+      setIsApiKeyModified(false)
+    } else {
+      setApiKey('')
+      setIsApiKeyModified(true)
+    }
   }
 
   const handleTestConnection = async () => {
@@ -56,7 +65,7 @@ export const OnboardingModal: React.FC = () => {
     try {
       const res = await window.api.testConnection({
         baseUrl: baseUrl.trim(),
-        apiKey: apiKey.trim(),
+        apiKey: isApiKeyModified ? apiKey.trim() : '',
         protocol,
         model: activeModel.trim()
       })
@@ -95,7 +104,7 @@ export const OnboardingModal: React.FC = () => {
     try {
       const res = await window.api.fetchModels({
         baseUrl: baseUrl.trim(),
-        apiKey: apiKey.trim(),
+        apiKey: isApiKeyModified ? apiKey.trim() : '',
         protocol
       })
 
@@ -133,7 +142,9 @@ export const OnboardingModal: React.FC = () => {
         presetId,
         name: currentPreset.name,
         baseUrl: baseUrl.trim(),
-        apiKey: apiKey.trim(),
+        ...(isApiKeyModified
+          ? { apiKey: apiKey.trim(), hasKey: apiKey.trim().length > 0 }
+          : { apiKey: config.provider.apiKey, hasKey: config.provider.hasKey }),
         protocol,
         activeModel: activeModel.trim(),
         availableModels: models
@@ -147,10 +158,14 @@ export const OnboardingModal: React.FC = () => {
     }
   }
 
+  const hasKeyConfigured = isApiKeyModified
+    ? apiKey.trim().length > 0
+    : Boolean(config.provider.hasKey || (apiKey && apiKey.trim().length > 0))
+
   const isFormValid =
     baseUrl.trim().length > 0 &&
     activeModel.trim().length > 0 &&
-    (!currentPreset.requiresApiKey || apiKey.trim().length > 0)
+    (!currentPreset.requiresApiKey || hasKeyConfigured)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-xs p-4 animate-in fade-in duration-150">
@@ -158,28 +173,28 @@ export const OnboardingModal: React.FC = () => {
         {/* Header */}
         <div className="p-6 pb-4 border-b border-stone-200">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center border border-stone-200">
-              <PenLine className="w-4 h-4 text-stone-800" />
+            <div className="w-10 h-10 rounded-xl bg-stone-900 text-white flex items-center justify-center shadow-md">
+              <PenLine className="w-5 h-5 text-stone-100" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-stone-900">
-                Explosion 创作工作台
+              <h2 className="text-base font-bold text-stone-900 tracking-tight">
+                欢迎使用 Explosion
               </h2>
               <p className="text-xs text-stone-500 mt-0.5">
-                首次配置：设定主力语言模型以启动写作辅助功能。
+                面向专业网络小说作家的本地优先、重度自动化 AI 创作桌面工作台
               </p>
             </div>
           </div>
         </div>
 
-        {/* Content Body */}
-        <div className="p-6 space-y-4 overflow-y-auto flex-1 text-xs scrollbar-thin">
-          {/* Preset Selector */}
+        {/* Content */}
+        <div className="p-6 overflow-y-auto space-y-4 text-xs flex-1">
+          {/* Preset Selection */}
           <div>
-            <label className="block font-medium text-stone-700 mb-2">
-              服务商预设
+            <label className="block font-medium text-stone-700 mb-1.5">
+              1. 选择大模型服务商预设
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {PRESET_LIST.map((preset) => (
                 <button
                   key={preset.id}
@@ -187,27 +202,24 @@ export const OnboardingModal: React.FC = () => {
                   onClick={() => handlePresetSelect(preset.id)}
                   className={`p-2.5 rounded-lg border text-left transition-all ${
                     presetId === preset.id
-                      ? 'border-stone-900 bg-stone-50 text-stone-900 font-medium'
-                      : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:text-stone-900'
+                      ? 'border-stone-800 bg-stone-50 text-stone-900 shadow-2xs font-medium'
+                      : 'border-stone-200 hover:border-stone-300 text-stone-600'
                   }`}
                 >
-                  <div className="text-xs">{preset.name}</div>
-                  <div className="text-[10px] text-stone-400 truncate mt-0.5">
-                    {preset.id === 'deepseek' ? '推荐' : preset.id}
+                  <div className="font-semibold text-xs">{preset.name}</div>
+                  <div className="text-[10px] text-stone-400 mt-0.5 truncate">
+                    {preset.description}
                   </div>
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-stone-500 mt-1.5 px-0.5">
-              {currentPreset.description}
-            </p>
           </div>
 
           {/* Base URL & Protocol */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
               <label className="block font-medium text-stone-700 mb-1">
-                API Base URL
+                Base URL
               </label>
               <input
                 type="text"
@@ -236,9 +248,16 @@ export const OnboardingModal: React.FC = () => {
           {/* API Key */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="font-medium text-stone-700">
-                API Key 凭据
-              </label>
+              <div className="flex items-center gap-2">
+                <label className="font-medium text-stone-700">
+                  API Key 凭据
+                </label>
+                {config.provider.hasKey && !isApiKeyModified && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
+                    已加密存储
+                  </span>
+                )}
+              </div>
               {!currentPreset.requiresApiKey && (
                 <span className="text-[10px] text-stone-400">无需密钥（可留空）</span>
               )}
@@ -247,7 +266,10 @@ export const OnboardingModal: React.FC = () => {
               <input
                 type={showApiKey ? 'text' : 'password'}
                 value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                onChange={(e) => {
+                  setApiKey(e.target.value)
+                  setIsApiKeyModified(true)
+                }}
                 placeholder={currentPreset.apiKeyPlaceholder}
                 className="w-full bg-white border border-stone-200 rounded-lg pl-3 pr-10 py-2 font-mono text-stone-900 placeholder-stone-400 focus:outline-none focus:border-stone-800"
               />
