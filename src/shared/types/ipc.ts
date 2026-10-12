@@ -45,6 +45,16 @@ export interface ProjectSnapshot {
   charCount: number
 }
 
+
+export interface ManuscriptExportResult {
+  success: boolean
+  canceled?: boolean
+  filePath?: string
+  chapterCount?: number
+  totalChars?: number
+  error?: string
+}
+
 export interface ProjectData {
   path: string
   title: string
@@ -209,6 +219,7 @@ export const IPC_CHANNELS = {
   PROJECT_RENAME_CHAPTER: 'project:rename-chapter',
   PROJECT_DELETE_CHAPTER: 'project:delete-chapter',
   PROJECT_SAVE_META: 'project:save-meta',
+  PROJECT_EXPORT_MANUSCRIPT: 'project:export-manuscript',
   PROJECT_CLOSE: 'project:close',
   PROJECT_FILE_CHANGED: 'project:file-changed',
 
@@ -298,6 +309,10 @@ export interface ElectronApi {
   }) => Promise<boolean>
   saveProjectMeta: (params: { projectPath: string; title: string }) => Promise<boolean>
   closeProject: () => Promise<boolean>
+  exportManuscript: (params: {
+    projectPath: string
+    targetPath?: string
+  }) => Promise<ManuscriptExportResult>
   onProjectFileChanged: (
     callback: (payload: ProjectFileChangedPayload) => void
   ) => () => void

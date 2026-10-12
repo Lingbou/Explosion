@@ -1,0 +1,48 @@
+appId: com.explosion.app
+productName: Explosion
+
+directories:
+  buildResources: resources
+  output: dist
+
+files:
+  - out/**/*
+  - resources/**/*
+  - src/main/library/organize_library.py
+  - package.json
+
+asar: true
+npmRebuild: false
+
+linux:
+  icon: resources/icon.png
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  category: Utility
+  maintainer: Lingbou <lingbou@users.noreply.github.com>
+  syncDesktopName: true
+  synopsis: 现代化 AI 小说创作工作台
+  description: 专为网文/严肃创作者打造的本地优先、零 Markdown 污染 AI 小说创作工作台。
+
+deb:
+  priority: optional
+  packageCategory: utils
+
+win:
+  icon: resources/icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Explosion

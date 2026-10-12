@@ -28,6 +28,7 @@ export interface ProviderConfig {
   name: string
   baseUrl: string
   apiKey: string
+  hasKey?: boolean
   protocol: LLMProtocol
   activeModel: string
   availableModels: string[]

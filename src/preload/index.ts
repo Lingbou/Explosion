@@ -4,6 +4,7 @@ import {
   ElectronApi,
   ProjectData,
   ProjectChapterFile,
+  ManuscriptExportResult,
   ProjectSnapshot,
   StoryBibleFile,
   LibraryBook,
@@ -159,6 +160,12 @@ const api: ElectronApi = {
     ipcRenderer.invoke(IPC_CHANNELS.PROJECT_SAVE_META, params),
 
   closeProject: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_CLOSE),
+
+  exportManuscript: (params: {
+    projectPath: string
+    targetPath?: string
+  }): Promise<ManuscriptExportResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_EXPORT_MANUSCRIPT, params),
 
   onProjectFileChanged: (
     callback: (payload: ProjectFileChangedPayload) => void

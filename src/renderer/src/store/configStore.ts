@@ -24,7 +24,7 @@ function checkIsConfigured(config: AppConfig): boolean {
   }
   const preset = PROVIDER_PRESETS[provider.presetId]
   if (preset?.requiresApiKey) {
-    return Boolean(provider.apiKey && provider.apiKey.trim().length > 0)
+    return Boolean(provider.hasKey || (provider.apiKey && provider.apiKey.trim().length > 0))
   }
   return true
 }

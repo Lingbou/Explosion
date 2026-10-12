@@ -132,7 +132,7 @@ git worktree list
    * 桌面端：`Electron 35+` + `TypeScript 5.8+` + `Node 24+`；
    * 构建工具：`electron-vite` + `Vite 6`；
    * 渲染端：`React 19` + `Tailwind CSS v4` + `Zustand 5` + `Lucide React`；
-   * 本地存储：本地文件系统作为唯一事实源（Markdown/纯文本/JSON）+ `better-sqlite3`（FTS5 全文搜索）。
+   * 本地存储：本地文件系统作为唯一事实源（Markdown/纯文本/JSON）+ `node:sqlite`（FTS5 全文搜索）。
 2. **正文输出零 Markdown 污染**：
    * 小说正文手稿容器必须为纯文本，严禁渲染或写入 `#`、`**`、`-` 等格式标记；
    * 提供符合中文排版规范的纯文本复制能力（段首全角双空格缩进、中文引号规范）。
