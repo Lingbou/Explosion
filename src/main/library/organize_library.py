@@ -11,6 +11,8 @@ Explosion 资料库大部头物理拆解、FTS5 全文索引与 768 维语义向
 6. 自动清理拆解后的原始庞大单文件。
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import re
