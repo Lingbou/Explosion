@@ -17,49 +17,76 @@ export interface CollectedManuscriptChapter extends ExportChapterInput {
 }
 
 /**
+ * Extracts a sequence number from a manuscript chapter/volume name or filename.
+ * Handles:
+ * - Semantic markers: "序章", "引子", "楔子" -> 0; "尾声", "后记", "终章" -> 999999
+ * - Numeric prefixes: "001-", "010-", "2-", "1."
+ * - Chinese chapter numerals: "第一章", "第二章", "第十章", "第一百章", "第1章", "第10章"
+ * - Chinese volume numerals: "第一卷", "第二卷", "卷一", "卷十", "Volume 1"
+ * - Standalone Chinese numerals: "一", "二", "十"
+ */
+export function extractSequenceNumber(name: string): number | null {
+  const baseName = name.replace(/\.txt$/i, '').trim()
+
+  // Prologue markers -> 0
+  if (/(?:^|[-_.])(?:序章|序幕|序言|序|引子|前言|楔子)/.test(baseName)) {
+    return 0
+  }
+  // Epilogue markers -> 999999
+  if (/(?:^|[-_.])(?:尾声|后记|后序|结语|终章)/.test(baseName)) {
+    return 999999
+  }
+
+  // 1. Numeric prefix: e.g. "010-", "2-", "003."
+  const numMatch = baseName.match(/^(\d+)[-_.]/)
+  if (numMatch) {
+    return parseInt(numMatch[1], 10)
+  }
+
+  // 2. Chinese chapter numeral: "第X章", "第X回", "第X节"
+  const chMatch = baseName.match(/^第([0-9零一二三四五六七八九十百千万]+)[章回节]/)
+  if (chMatch) {
+    return parseChineseNumber(chMatch[1])
+  }
+
+  // 3. Chinese volume numeral: "第X卷", "卷X", "Volume X"
+  const volMatch = baseName.match(
+    /^(?:第([0-9零一二三四五六七八九十百千万]+)卷|卷([0-9零一二三四五六七八九十百千万]+)|volume\s*(\d+))/i
+  )
+  if (volMatch) {
+    const raw = volMatch[1] || volMatch[2] || volMatch[3]
+    return parseChineseNumber(raw)
+  }
+
+  // 4. Standalone Chinese numerals at start: "一", "二", "十" followed by separator or end
+  const standaloneMatch = baseName.match(/^([零一二三四五六七八九十百千万]+)(?:[-_.\s]|$)/)
+  if (standaloneMatch) {
+    const parsed = parseChineseNumber(standaloneMatch[1])
+    if (parsed !== null) return parsed
+  }
+
+  return null
+}
+
+/**
  * Natural numeric and Chinese chapter/volume comparator:
- * 1. Numeric prefix: "001-", "002-", "10-"
- * 2. Chinese chapter numerals: "第一章", "第二章", "第十章", "第一百章"
- * 3. Chinese volume numerals: "第一卷", "第二卷", "卷一", "卷十"
- * 4. Fallback to standard natural locale comparison
+ * Compares by extracted sequence number across ALL formats (Arabic, Chinese, Volume, Chapter),
+ * falling back to natural locale comparison when sequence numbers are identical or null.
  */
 export function compareManuscriptNames(a: string, b: string): number {
-  // 1. Numeric prefix: e.g. "001-..." vs "010-..."
-  const numMatchA = a.match(/^(\d+)[-_.]/)
-  const numMatchB = b.match(/^(\d+)[-_.]/)
-  if (numMatchA && numMatchB) {
-    const numA = parseInt(numMatchA[1], 10)
-    const numB = parseInt(numMatchB[1], 10)
+  const numA = extractSequenceNumber(a)
+  const numB = extractSequenceNumber(b)
+
+  if (numA !== null && numB !== null) {
     if (numA !== numB) {
       return numA - numB
     }
+  } else if (numA !== null && numB === null) {
+    return -1
+  } else if (numA === null && numB !== null) {
+    return 1
   }
 
-  // 2. Chinese chapter numeral: "第X章..."
-  const chMatchA = a.match(/^第([0-9零一二三四五六七八九十百千万]+)章/)
-  const chMatchB = b.match(/^第([0-9零一二三四五六七八九十百千万]+)章/)
-  if (chMatchA && chMatchB) {
-    const numA = parseChineseNumber(chMatchA[1])
-    const numB = parseChineseNumber(chMatchB[1])
-    if (numA !== null && numB !== null && numA !== numB) {
-      return numA - numB
-    }
-  }
-
-  // 3. Chinese volume numeral: "第X卷..." or "卷X..."
-  const volMatchA = a.match(/^(?:第([0-9零一二三四五六七八九十百千万]+)卷|卷([0-9零一二三四五六七八九十百千万]+))/)
-  const volMatchB = b.match(/^(?:第([0-9零一二三四五六七八九十百千万]+)卷|卷([0-9零一二三四五六七八九十百千万]+))/)
-  if (volMatchA && volMatchB) {
-    const rawNumA = volMatchA[1] || volMatchA[2]
-    const rawNumB = volMatchB[1] || volMatchB[2]
-    const numA = parseChineseNumber(rawNumA)
-    const numB = parseChineseNumber(rawNumB)
-    if (numA !== null && numB !== null && numA !== numB) {
-      return numA - numB
-    }
-  }
-
-  // 4. Fallback natural sort
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
 }
 
