@@ -12,9 +12,9 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "build:unpack": "pnpm build && electron-builder --dir",
-    "dist": "pnpm build && electron-builder",
-    "dist:linux": "pnpm build && electron-builder --linux",
-    "dist:win": "pnpm build && electron-builder --win",
+    "dist": "pnpm build && electron-builder --publish never",
+    "dist:linux": "pnpm build && electron-builder --linux --publish never",
+    "dist:win": "pnpm build && electron-builder --win --publish never",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run"
   },
