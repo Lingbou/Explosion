@@ -25,6 +25,7 @@ import {
   countTextStats
 } from '../src/shared/utils/typography'
 import {
+  extractSequenceNumber,
   compareManuscriptNames,
   getDefaultExportFilename,
   collectManuscriptChapters,
@@ -61,7 +62,7 @@ describe('Manuscript Export Typography & Formatting', () => {
     const chapters = [
       {
         title: '第三章 试炼',
-        content: '# 章节标题\n\n**少年**拔出*利剑*，喊道:"决一死战..."随后拔刀--迎着夜色。\n\n> 引用语录\n\n- 装备列表项'
+        content: '# 章节标题\n\n---\n\n**少年**拔出*利剑*，喊道:"决一死战..."随后拔刀--迎着夜色。\n\n>> 多级引用语录\n\n- 装备列表项'
       }
     ]
 
@@ -72,14 +73,15 @@ describe('Manuscript Export Typography & Formatting', () => {
     expect(exported).not.toContain('*')
     expect(exported).not.toContain('>')
     expect(exported).not.toContain('- 装备')
+    expect(exported).not.toContain('---')
     // Punctuation standardized
     expect(exported).toContain('“决一死战……”')
     expect(exported).toContain('——迎着夜色')
     expect(exported).toContain('\u3000\u3000少年拔出利剑')
   })
 
-  it('deduplicates chapter title if content already starts with the title', () => {
-    const chapters = [
+  it('deduplicates chapter title if content already starts with the title or filename title', () => {
+    const chapters1 = [
       {
         title: '第一章 启程',
         filename: '001-第一章 启程.txt',
@@ -87,12 +89,22 @@ describe('Manuscript Export Typography & Formatting', () => {
       }
     ]
 
-    const exported = formatManuscriptExport(chapters)
+    const exported1 = formatManuscriptExport(chapters1)
+    const matches1 = exported1.match(/第一章 启程/g)
+    expect(matches1?.length).toBe(1)
+    expect(exported1.startsWith('第一章 启程\n\n\u3000\u3000晨曦洒在城门上。')).toBe(true)
 
-    // Title should only appear once at the top
-    const matches = exported.match(/第一章 启程/g)
-    expect(matches?.length).toBe(1)
-    expect(exported.startsWith('第一章 启程\n\n\u3000\u3000晨曦洒在城门上。')).toBe(true)
+    // Variant: content starts with full filename base without numeric prefix
+    const chapters2 = [
+      {
+        title: '第二章 决战',
+        filename: '002-第二章 决战.txt',
+        content: '第二章 决战\n\n剑气纵横。'
+      }
+    ]
+    const exported2 = formatManuscriptExport(chapters2)
+    const matches2 = exported2.match(/第二章 决战/g)
+    expect(matches2?.length).toBe(1)
   })
 
   it('normalizes excessive blank lines within chapters to at most 1 empty line', () => {
@@ -141,6 +153,20 @@ describe('Manuscript Export Typography & Formatting', () => {
 })
 
 describe('Manuscript Sorting & Default Filename', () => {
+  it('correctly extracts sequence numbers across Arabic and Chinese naming styles', () => {
+    expect(extractSequenceNumber('序章.txt')).toBe(0)
+    expect(extractSequenceNumber('引子.txt')).toBe(0)
+    expect(extractSequenceNumber('010-决战.txt')).toBe(10)
+    expect(extractSequenceNumber('2-试炼.txt')).toBe(2)
+    expect(extractSequenceNumber('第二章.txt')).toBe(2)
+    expect(extractSequenceNumber('第十章.txt')).toBe(10)
+    expect(extractSequenceNumber('第一百章.txt')).toBe(100)
+    expect(extractSequenceNumber('卷一')).toBe(1)
+    expect(extractSequenceNumber('第一卷 塞外')).toBe(1)
+    expect(extractSequenceNumber('第十卷 决战')).toBe(10)
+    expect(extractSequenceNumber('尾声.txt')).toBe(999999)
+  })
+
   it('correctly compares numeric prefixes in natural order', () => {
     expect(compareManuscriptNames('001-第一章.txt', '002-第二章.txt')).toBeLessThan(0)
     expect(compareManuscriptNames('002-第二章.txt', '010-第十章.txt')).toBeLessThan(0)
@@ -159,6 +185,25 @@ describe('Manuscript Sorting & Default Filename', () => {
     expect(compareManuscriptNames('第二卷', '第十卷')).toBeLessThan(0)
     expect(compareManuscriptNames('卷一 蛮荒', '卷二 苍云')).toBeLessThan(0)
     expect(compareManuscriptNames('卷二 苍云', '卷十 决战')).toBeLessThan(0)
+  })
+
+  it('eliminates ASCII order inversion in mixed Arabic and Chinese naming', () => {
+    // 010- must come AFTER 2- and 第二章 (10 > 2), NEVER before due to ASCII '0' < '2' or '0' < '第'
+    expect(compareManuscriptNames('2-xx.txt', '010-xx.txt')).toBeLessThan(0)
+    expect(compareManuscriptNames('第二章.txt', '010-xx.txt')).toBeLessThan(0)
+    expect(compareManuscriptNames('010-xx.txt', '第二章.txt')).toBeGreaterThan(0)
+    expect(compareManuscriptNames('010-xx.txt', '2-xx.txt')).toBeGreaterThan(0)
+
+    // Volume 1 must come before Chapter 2 and Chapter 10
+    expect(compareManuscriptNames('卷一', '2-xx.txt')).toBeLessThan(0)
+    expect(compareManuscriptNames('卷一', '010-xx.txt')).toBeLessThan(0)
+
+    // Complete mixed list sort test
+    const mixedList = ['010-xx.txt', '2-xx.txt', '第二章.txt', '卷一']
+    mixedList.sort(compareManuscriptNames)
+    expect(mixedList[0]).toBe('卷一')
+    expect(mixedList.slice(1, 3)).toEqual(expect.arrayContaining(['2-xx.txt', '第二章.txt']))
+    expect(mixedList[3]).toBe('010-xx.txt')
   })
 
   it('generates standard default filename with title and current date', () => {
@@ -219,11 +264,33 @@ describe('ProjectManager & File Exporter (Sandboxed)', () => {
     expect(chapters[3].volume).toBe('02-第二卷')
   })
 
+  it('handles mixed naming (010-xx, 2-xx, 第二章, 卷一/003-xx) in natural order without ASCII flaws', () => {
+    const manuscriptDir = path.join(tempProjectDir, 'manuscript')
+    const vol1Dir = path.join(manuscriptDir, '卷一')
+    fs.mkdirSync(vol1Dir, { recursive: true })
+
+    // Deliberately create in disordered sequence
+    fs.writeFileSync(path.join(manuscriptDir, '010-第十章 决战.txt'), '第十章决战内容。', 'utf-8')
+    fs.writeFileSync(path.join(manuscriptDir, '2-第二章 试炼A.txt'), '2-第二章试炼A内容。', 'utf-8')
+    fs.writeFileSync(path.join(manuscriptDir, '第二章 试炼B.txt'), '第二章试炼B内容。', 'utf-8')
+    fs.writeFileSync(path.join(vol1Dir, '003-第三章 突围.txt'), '卷一第三章突围内容。', 'utf-8')
+
+    const chapters = collectManuscriptChapters(manuscriptDir)
+
+    // Volume 1 (num 1) -> 2-第二章 (num 2) -> 第二章 (num 2) -> 010-第十章 (num 10)
+    expect(chapters.length).toBe(4)
+    expect(chapters[0].volume).toBe('卷一')
+    expect(chapters[0].filename).toBe('003-第三章 突围.txt')
+
+    // Chapter 10 must be the LAST item, never first!
+    expect(chapters[3].filename).toBe('010-第十章 决战.txt')
+  })
+
   it('exports manuscript to specified targetPath with zero markdown and standard typography', async () => {
     await manager.loadProject(tempProjectDir)
 
     // Remove the initial default empty chapter so we have only our test chapters
-    const defaultFile = path.join(tempProjectDir, "manuscript", "001-第一章.txt")
+    const defaultFile = path.join(tempProjectDir, 'manuscript', '001-第一章.txt')
     if (fs.existsSync(defaultFile)) {
       fs.unlinkSync(defaultFile)
     }

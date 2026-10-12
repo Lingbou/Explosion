@@ -16,6 +16,8 @@ export function stripMarkdownMarks(text: string): string {
     // Remove inline backticks
     .replace(/`([^`]+)`/g, '$1')
     .replace(/`/g, '')
+    // Remove horizontal rules (---, ***, ___)
+    .replace(/^[-*_]{3,}\s*$/gm, '')
     // Remove bold/italics combinations (***...***, **...**, *...*)
     .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
@@ -30,8 +32,8 @@ export function stripMarkdownMarks(text: string): string {
     .replace(/^#{1,6}\s+/gm, '')
     // Remove markdown links [text](url) -> text
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    // Remove blockquotes (> text)
-    .replace(/^>\s*/gm, '')
+    // Remove blockquotes (> text, >> text)
+    .replace(/^>+\s*/gm, '')
     // Remove bullet points (- item, * item, + item)
     .replace(/^[-*+]\s+/gm, '')
 
@@ -166,9 +168,11 @@ export function formatManuscriptExport(chapters: ExportChapterInput[]): string {
         ? chapter.filename.replace(/\.txt$/i, '').replace(/\s+/g, '')
         : ''
 
+      const cleanBase = filenameBase.replace(/^\d+[-_]/, "")
       if (
         normalizedFirst === normalizedTitle ||
-        (filenameBase && normalizedFirst === filenameBase)
+        (filenameBase && normalizedFirst === filenameBase) ||
+        (cleanBase && normalizedFirst === cleanBase)
       ) {
         chapterTitle = firstLine
         lines.splice(firstNonEmptyIdx, 1)
