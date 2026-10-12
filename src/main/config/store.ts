@@ -4,6 +4,7 @@ import * as os from 'os'
 import { AppConfig, AppPaths } from '../../shared/types/config'
 import { PROVIDER_PRESETS } from '../../shared/constants/presets'
 import { DEFAULT_CONFIG } from '../../shared/constants/config'
+import { sanitizeUiConfig } from '../../shared/utils/uiConfig'
 import {
   ApiKeyCipher,
   isMaskedApiKey,
@@ -258,10 +259,10 @@ export class ConfigStore {
         ...initial.workspace,
         ...(partial.workspace || {})
       },
-      ui: {
+      ui: sanitizeUiConfig({
         ...initial.ui,
         ...(partial.ui || {})
-      }
+      })
     }
   }
 }

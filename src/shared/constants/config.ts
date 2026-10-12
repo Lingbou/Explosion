@@ -1,5 +1,13 @@
 import { AppConfig } from '../types/config'
 
+export const MIN_FONT_SIZE = 14
+export const MAX_FONT_SIZE = 24
+export const DEFAULT_FONT_SIZE = 16
+
+export const MIN_LINE_HEIGHT = 1.5
+export const MAX_LINE_HEIGHT = 2.4
+export const DEFAULT_LINE_HEIGHT = 1.85
+
 export const DEFAULT_CONFIG: AppConfig = {
   version: '0.1.0',
   provider: {
@@ -19,8 +27,9 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   ui: {
     theme: 'dark',
-    fontSize: 16,
-    lineHeight: 1.85,
-    indentSize: 2
+    fontSize: DEFAULT_FONT_SIZE,
+    lineHeight: DEFAULT_LINE_HEIGHT,
+    indentSize: 2,
+    typewriterMode: true
   }
 }
