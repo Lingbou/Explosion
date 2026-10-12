@@ -1,8 +1,9 @@
+import { useAgentStore } from './agentStore'
 import { create } from 'zustand'
 import { formatChineseManuscript } from '../lib/typography'
 import { validateSelection } from '../lib/selection'
 import { getNextChapterTitle } from '../../../shared/utils/chineseNumerals'
-import { ProjectChapterFile, StoryBibleData, StoryBibleFile } from '../../../shared/types/ipc'
+import { ProjectChapterFile, StoryBibleData, StoryBibleFile, ManuscriptExportResult } from '../../../shared/types/ipc'
 
 export type Chapter = ProjectChapterFile
 
@@ -67,6 +68,16 @@ interface WorkspaceState {
   saveActiveDocument: () => Promise<void>
   saveActiveChapter: () => Promise<void>
   insertText: (text: string) => void
+  // Export Actions & State
+  isExporting: boolean
+  exportResult: {
+    visible: boolean
+    filePath: string
+    chapterCount: number
+    totalChars: number
+  } | null
+  dismissExportResult: () => void
+  exportManuscript: () => Promise<ManuscriptExportResult>
 }
 
 const DEFAULT_CHAPTER_TEMPLATE = {
@@ -92,6 +103,47 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   lastSavedAt: null,
   selectedText: null,
   selectionRange: null,
+  isExporting: false,
+  exportResult: null,
+  dismissExportResult: () => {
+    set({ exportResult: null })
+  },
+  exportManuscript: async () => {
+    const { projectPath, isDirty, saveActiveDocument, chapters } = get()
+    if (!projectPath) {
+      return { success: false, error: "未打开工程" }
+    }
+    if (chapters.length === 0) {
+      return { success: false, error: "当前工程暂无手稿章节可供导出" }
+    }
+
+    if (isDirty) {
+      await saveActiveDocument()
+    }
+
+    set({ isExporting: true })
+    try {
+      const res = await window.api.exportManuscript({ projectPath })
+      if (res.success && res.filePath) {
+        set({
+          exportResult: {
+            visible: true,
+            filePath: res.filePath,
+            chapterCount: res.chapterCount || chapters.length,
+            totalChars: res.totalChars || 0
+          }
+        })
+      }
+      return res
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "导出异常"
+      }
+    } finally {
+      set({ isExporting: false })
+    }
+  },
 
   initWorkspace: async (lastProjectPath?: string | null) => {
     // Setup Live File Sync listener once
@@ -185,6 +237,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           selectedText: null,
           selectionRange: null
         })
+        useAgentStore.getState().initProjectSessions(data.path)
       }
     } catch {
       // ignore
@@ -213,6 +266,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       selectedText: null,
       selectionRange: null
     })
+    useAgentStore.getState().initProjectSessions(null)
   },
 
   setProjectTitle: (title: string) => {

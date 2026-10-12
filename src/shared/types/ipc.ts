@@ -45,6 +45,16 @@ export interface ProjectSnapshot {
   charCount: number
 }
 
+
+export interface ManuscriptExportResult {
+  success: boolean
+  canceled?: boolean
+  filePath?: string
+  chapterCount?: number
+  totalChars?: number
+  error?: string
+}
+
 export interface ProjectData {
   path: string
   title: string
@@ -131,6 +141,53 @@ export interface AgentStreamEvent {
   done?: boolean
 }
 
+
+export interface AgentTraceStep {
+  id: string
+  type: "tool_call"
+  toolName: string
+  args: Record<string, unknown>
+  result?: string
+  error?: string
+  durationMs?: number
+  status: "running" | "success" | "error"
+  timestamp: number
+}
+
+export interface AgentMessage {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  thinking?: string
+  traces?: AgentTraceStep[]
+  subagents?: SubAgentTaskInfo[]
+  selectedText?: string
+  timestamp: number
+}
+
+export interface AgentSession {
+  id: string
+  title: string
+  projectPath?: string
+  messages: AgentMessage[]
+  createdAt: number
+  updatedAt: number
+}
+
+export interface AgentSessionSummary {
+  id: string
+  title: string
+  projectPath: string
+  createdAt: number
+  updatedAt: number
+  messageCount: number
+}
+
+export interface AgentSessionIndex {
+  activeSessionId?: string
+  sessions: AgentSessionSummary[]
+}
+
 export interface ProjectFileChangedPayload {
   projectPath: string
   filePath: string
@@ -168,8 +225,16 @@ export const IPC_CHANNELS = {
   PROJECT_REORDER_CHAPTERS: 'project:reorder-chapters',
   PROJECT_MOVE_CHAPTER: 'project:move-chapter',
   PROJECT_SAVE_META: 'project:save-meta',
+  PROJECT_EXPORT_MANUSCRIPT: 'project:export-manuscript',
   PROJECT_CLOSE: 'project:close',
   PROJECT_FILE_CHANGED: 'project:file-changed',
+
+  // Agent Sessions File Persistence
+  AGENT_SESSION_LIST: 'agent:session:list',
+  AGENT_SESSION_LOAD: 'agent:session:load',
+  AGENT_SESSION_SAVE: 'agent:session:save',
+  AGENT_SESSION_RENAME: 'agent:session:rename',
+  AGENT_SESSION_DELETE: 'agent:session:delete',
 
   // Snapshots & Time Machine
   SNAPSHOT_LIST: 'snapshot:list',
@@ -279,9 +344,20 @@ export interface ElectronApi {
   }) => Promise<{ success: boolean; chapters: ProjectChapterFile[] }>
   saveProjectMeta: (params: { projectPath: string; title: string }) => Promise<boolean>
   closeProject: () => Promise<boolean>
+  exportManuscript: (params: {
+    projectPath: string
+    targetPath?: string
+  }) => Promise<ManuscriptExportResult>
   onProjectFileChanged: (
     callback: (payload: ProjectFileChangedPayload) => void
   ) => () => void
+
+  // Agent Sessions File Persistence
+  listAgentSessions: (params: { projectPath: string }) => Promise<AgentSession[]>
+  loadAgentSession: (params: { projectPath: string; sessionId: string }) => Promise<AgentSession | null>
+  saveAgentSession: (params: { projectPath: string; session: AgentSession }) => Promise<boolean>
+  renameAgentSession: (params: { projectPath: string; sessionId: string; title: string }) => Promise<boolean>
+  deleteAgentSession: (params: { projectPath: string; sessionId: string }) => Promise<boolean>
 
   // Snapshots & Time Machine
   listSnapshots: (params: { projectPath: string; filename?: string }) => Promise<ProjectSnapshot[]>

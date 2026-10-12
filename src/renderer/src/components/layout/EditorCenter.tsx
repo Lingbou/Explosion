@@ -12,7 +12,8 @@ import {
   History,
   BookText,
   User,
-  Bookmark
+  Bookmark,
+  Download
 } from 'lucide-react'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { countTextStats } from '../../lib/typography'
@@ -35,7 +36,9 @@ export const EditorCenter: React.FC = () => {
     addChapter,
     selectedText,
     setSelection,
-    clearSelection
+    clearSelection,
+    exportManuscript,
+    isExporting
   } = useWorkspaceStore()
 
   const [copied, setCopied] = useState(false)
@@ -235,6 +238,17 @@ export const EditorCenter: React.FC = () => {
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-stone-500" />}
             <span>{copied ? '已复制' : '复制纯文本'}</span>
+          </button>
+          <div className="w-[1px] h-3.5 bg-stone-200" />
+
+          <button
+            onClick={() => exportManuscript()}
+            disabled={isExporting}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-md transition-colors disabled:opacity-50"
+            title="交稿导出：按章节顺序合并全书并导出为出版级规范纯文本 (.txt)"
+          >
+            <Download className="w-3.5 h-3.5 text-stone-500" />
+            <span>{isExporting ? "导出中..." : "交稿导出"}</span>
           </button>
         </div>
       </div>

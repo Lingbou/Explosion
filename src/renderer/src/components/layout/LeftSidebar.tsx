@@ -17,7 +17,8 @@ import {
   Layers,
   Folder,
   AlertTriangle,
-  GripVertical
+  GripVertical,
+  Download
 } from 'lucide-react'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useLibraryStore } from '../../store/libraryStore'
@@ -57,7 +58,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
     renameStoryFile,
     openProject,
     createProject,
-    closeProject
+    closeProject,
+    exportManuscript,
+    isExporting
   } = useWorkspaceStore()
 
   const {
@@ -505,6 +508,17 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                     className="w-full text-left px-3 py-1.5 hover:bg-stone-50 text-stone-600 hover:text-stone-900 transition-colors border-t border-stone-100"
                   >
                     重命名小说名称...
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsProjectMenuOpen(false)
+                      exportManuscript()
+                    }}
+                    disabled={isExporting}
+                    className="w-full text-left px-3 py-1.5 hover:bg-stone-50 text-stone-700 hover:text-stone-900 transition-colors border-t border-stone-100 flex items-center gap-2"
+                  >
+                    <Download className="w-3.5 h-3.5 text-stone-500" />
+                    <span>交稿导出全书 (.txt)...</span>
                   </button>
                   <button
                     onClick={() => {
