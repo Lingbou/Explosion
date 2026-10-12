@@ -641,7 +641,7 @@ export const EditorCenter: React.FC = () => {
             paddingLeft: 'max(2rem, calc((100% - 56rem) / 2))',
             paddingRight: 'max(2rem, calc((100% - 56rem) / 2))',
             paddingTop: '2.5rem',
-            paddingBottom: typewriterMode ? 'max(8rem, calc(50vh - 2rem))' : '8rem'
+            paddingBottom: typewriterMode ? 'max(8rem, 50vh)' : '8rem'
           }}
         />
       </div>
