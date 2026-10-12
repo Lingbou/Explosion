@@ -7,8 +7,10 @@ import {
   ProjectData,
   ProjectFileChangedPayload,
   StoryBibleData,
-  StoryBibleFile
+  StoryBibleFile,
+  ManuscriptExportResult
 } from '../../shared/types/ipc'
+import { exportManuscriptToFile } from './exporter'
 import { ConfigStore, globalConfigStore } from '../config/store'
 import { globalSnapshotManager } from './snapshot-manager'
 
@@ -383,6 +385,14 @@ export class ProjectManager {
       activeChapterId: activeChapterId || chapters[0].id,
       storyBible
     }
+  }
+
+  public async exportManuscript(
+    projectPath: string,
+    targetPath?: string,
+    window?: BrowserWindow | null
+  ): Promise<ManuscriptExportResult> {
+    return exportManuscriptToFile(projectPath, targetPath, window)
   }
 
   public closeCurrentProject(): boolean {

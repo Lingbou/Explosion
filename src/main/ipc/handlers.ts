@@ -187,6 +187,17 @@ export function registerIpcHandlers(): void {
     }
   )
 
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_EXPORT_MANUSCRIPT,
+    async (
+      event,
+      { projectPath, targetPath }: { projectPath: string; targetPath?: string }
+    ) => {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      return globalProjectManager.exportManuscript(projectPath, targetPath, win)
+    }
+  )
+
   ipcMain.handle(IPC_CHANNELS.PROJECT_CLOSE, async () => {
     return globalProjectManager.closeCurrentProject()
   })
