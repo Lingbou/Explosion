@@ -6,11 +6,11 @@ import { RightPanel } from './RightPanel'
 import { OnboardingModal } from '../OnboardingModal'
 import { SettingsModal } from '../SettingsModal'
 import { LibraryPreviewModal } from '../LibraryPreviewModal'
-import { useConfigStore } from '../../store/configStore'
+import { useConfigStore, applyTheme } from '../../store/configStore'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 
 export const WorkspaceShell: React.FC = () => {
-  const { loadConfig, isLoading } = useConfigStore()
+  const { config, loadConfig, isLoading } = useConfigStore()
   const { initWorkspace } = useWorkspaceStore()
 
   // Left sidebar width (180px - 420px, default 240px)
@@ -33,11 +33,21 @@ export const WorkspaceShell: React.FC = () => {
   useEffect(() => {
     loadConfig().then(() => {
       const cfg = useConfigStore.getState().config
+      if (cfg?.ui?.theme) {
+        applyTheme(cfg.ui.theme)
+      }
       if (cfg?.workspace?.lastProjectPath) {
         initWorkspace(cfg.workspace.lastProjectPath)
       }
     })
   }, [loadConfig, initWorkspace])
+
+  // Synchronize theme attribute with config changes
+  useEffect(() => {
+    if (config?.ui?.theme) {
+      applyTheme(config.ui.theme)
+    }
+  }, [config?.ui?.theme])
 
   // Left resizer mouse drag handlers
   const handleLeftMouseDown = useCallback((e: React.MouseEvent) => {
@@ -103,14 +113,14 @@ export const WorkspaceShell: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#fbfbfa] text-stone-500 text-xs font-mono">
+      <div className="h-screen w-screen flex items-center justify-center bg-[#fbfbfa] dark:bg-[#141413] text-stone-500 dark:text-stone-400 text-xs font-mono">
         加载中...
       </div>
     )
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#fbfbfa] text-stone-900 overflow-hidden font-sans relative">
+    <div className="h-screen w-screen flex flex-col bg-[#fbfbfa] dark:bg-[#141413] text-stone-900 dark:text-stone-100 overflow-hidden font-sans relative">
       {/* Frameless Integrated Custom Titlebar (Replaces OS Titlebar) */}
       <AppTitleBar />
 
@@ -122,7 +132,7 @@ export const WorkspaceShell: React.FC = () => {
         {/* Resizer Handle: Left to Center */}
         <div
           onMouseDown={handleLeftMouseDown}
-          className="w-1 -ml-0.5 z-20 hover:w-1.5 hover:bg-stone-400 active:bg-stone-600 transition-colors cursor-col-resize bg-transparent shrink-0"
+          className="w-1 -ml-0.5 z-20 hover:w-1.5 hover:bg-stone-400 dark:hover:bg-stone-600 active:bg-stone-600 dark:active:bg-stone-400 transition-colors cursor-col-resize bg-transparent shrink-0"
           title="拖拽调整左侧栏宽度"
         />
 
@@ -132,7 +142,7 @@ export const WorkspaceShell: React.FC = () => {
         {/* Resizer Handle: Center to Right */}
         <div
           onMouseDown={handleRightMouseDown}
-          className="w-1 -mr-0.5 z-20 hover:w-1.5 hover:bg-stone-400 active:bg-stone-600 transition-colors cursor-col-resize bg-transparent shrink-0"
+          className="w-1 -mr-0.5 z-20 hover:w-1.5 hover:bg-stone-400 dark:hover:bg-stone-600 active:bg-stone-600 dark:active:bg-stone-400 transition-colors cursor-col-resize bg-transparent shrink-0"
           title="拖拽调整助手栏宽度"
         />
 

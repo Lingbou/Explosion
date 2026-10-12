@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -13,11 +15,24 @@
     user-select: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
 
   ::selection {
     background-color: #e7e5e4;
     color: #1c1917;
+  }
+
+  [data-theme="dark"] body,
+  .dark body {
+    background-color: #141413;
+    color: #f5f5f4;
+  }
+
+  [data-theme="dark"] ::selection,
+  .dark ::selection {
+    background-color: #3f3d3a;
+    color: #fafaf9;
   }
 }
 
@@ -37,6 +52,16 @@
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: #d6d3d1;
+}
+
+[data-theme="dark"] .scrollbar-thin::-webkit-scrollbar-thumb,
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #383532;
+}
+
+[data-theme="dark"] .scrollbar-thin::-webkit-scrollbar-thumb:hover,
+.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #4a4642;
 }
 
 .scrollbar-none::-webkit-scrollbar {

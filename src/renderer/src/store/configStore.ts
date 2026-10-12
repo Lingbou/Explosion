@@ -1,7 +1,8 @@
 import { create } from 'zustand'
-import { AppConfig, ProviderConfig } from '../../../shared/types/config'
+import { AppConfig, ProviderConfig, UiConfig, AppTheme } from '../../../shared/types/config'
 import { DEFAULT_CONFIG } from '../../../shared/constants/config'
 import { PROVIDER_PRESETS } from '../../../shared/constants/presets'
+import { sanitizeUiConfig } from '../../../shared/utils/uiConfig'
 
 interface ConfigState {
   config: AppConfig
@@ -13,8 +14,20 @@ interface ConfigState {
   saveConfig: (newConfig: AppConfig) => Promise<boolean>
   resetConfig: () => Promise<void>
   updateProvider: (updates: Partial<ProviderConfig>) => void
+  updateUiConfig: (updates: Partial<UiConfig>) => Promise<boolean>
   setIsOnboardingOpen: (open: boolean) => void
   setIsSettingsOpen: (open: boolean) => void
+}
+
+export function applyTheme(theme: AppTheme | string) {
+  if (typeof document === 'undefined') return
+  const root = document.documentElement
+  root.setAttribute('data-theme', theme)
+  if (theme === 'dark') {
+    root.classList.add('dark')
+  } else {
+    root.classList.remove('dark')
+  }
 }
 
 function checkIsConfigured(config: AppConfig): boolean {
@@ -24,7 +37,7 @@ function checkIsConfigured(config: AppConfig): boolean {
   }
   const preset = PROVIDER_PRESETS[provider.presetId]
   if (preset?.requiresApiKey) {
-    return Boolean(provider.apiKey && provider.apiKey.trim().length > 0)
+    return Boolean(provider.hasKey || (provider.apiKey && provider.apiKey.trim().length > 0))
   }
   return true
 }
@@ -41,6 +54,11 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     try {
       const cfg = await window.api.getConfig()
       const configured = checkIsConfigured(cfg)
+      if (cfg?.ui?.theme) {
+        applyTheme(cfg.ui.theme)
+      } else {
+        applyTheme('dark')
+      }
       set({
         config: cfg,
         isConfigured: configured,
@@ -48,6 +66,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
         isLoading: false
       })
     } catch {
+      applyTheme('dark')
       set({
         config: DEFAULT_CONFIG,
         isConfigured: false,
@@ -59,6 +78,9 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
 
   saveConfig: async (newConfig: AppConfig) => {
     try {
+      if (newConfig.ui?.theme) {
+        applyTheme(newConfig.ui.theme)
+      }
       const res = await window.api.saveConfig(newConfig)
       if (res.success) {
         const configured = checkIsConfigured(res.config)
@@ -78,6 +100,9 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   resetConfig: async () => {
     try {
       const reset = await window.api.resetConfig()
+      if (reset?.ui?.theme) {
+        applyTheme(reset.ui.theme)
+      }
       set({
         config: reset,
         isConfigured: false,
@@ -98,6 +123,32 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       }
     }
     set({ config: updated })
+  },
+
+  updateUiConfig: async (updates: Partial<UiConfig>) => {
+    const current = get().config
+    const newUi = sanitizeUiConfig({
+      ...current.ui,
+      ...updates
+    })
+    const updated: AppConfig = {
+      ...current,
+      ui: newUi
+    }
+    if (newUi.theme) {
+      applyTheme(newUi.theme)
+    }
+    set({ config: updated })
+    try {
+      const res = await window.api.saveConfig(updated)
+      if (res.success) {
+        set({ config: res.config })
+        return true
+      }
+      return false
+    } catch {
+      return false
+    }
   },
 
   setIsOnboardingOpen: (open: boolean) => set({ isOnboardingOpen: open }),

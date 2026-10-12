@@ -28,6 +28,7 @@ export interface ProviderConfig {
   name: string
   baseUrl: string
   apiKey: string
+  hasKey?: boolean
   protocol: LLMProtocol
   activeModel: string
   availableModels: string[]
@@ -42,11 +43,14 @@ export interface WorkspaceConfig {
   autoSaveIntervalMs: number
 }
 
+export type AppTheme = 'dark' | 'light' | 'sepia'
+
 export interface UiConfig {
-  theme: 'dark' | 'light' | 'sepia'
+  theme: AppTheme
   fontSize: number
   lineHeight: number
   indentSize: number
+  typewriterMode: boolean
 }
 
 export interface AppConfig {

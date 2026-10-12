@@ -60,12 +60,12 @@ export const Combobox: React.FC<ComboboxProps> = ({
           onChange={handleInputChange}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
-          className="w-full bg-white border border-stone-200 rounded-lg px-3.5 py-2 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-stone-800 focus:ring-1 focus:ring-stone-800 transition-all font-mono"
+          className="w-full bg-white dark:bg-[#181716] border border-stone-200 dark:border-stone-700 rounded-lg px-3.5 py-2 text-xs text-stone-900 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-600 focus:outline-none focus:border-stone-800 dark:focus:border-stone-400 focus:ring-1 focus:ring-stone-800 dark:focus:ring-stone-400 transition-all font-mono"
         />
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="absolute right-2.5 p-1 text-stone-400 hover:text-stone-600 transition-colors"
+          className="absolute right-2.5 p-1 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 transition-colors cursor-pointer"
           tabIndex={-1}
         >
           <ChevronDown
@@ -75,7 +75,7 @@ export const Combobox: React.FC<ComboboxProps> = ({
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-stone-200 rounded-lg shadow-lg max-h-52 overflow-y-auto py-1 text-xs scrollbar-thin">
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-[#1f1e1c] border border-stone-200 dark:border-stone-700 rounded-lg shadow-lg max-h-52 overflow-y-auto py-1 text-xs scrollbar-thin">
           {filtered.length > 0 ? (
             filtered.map((opt) => (
               <div
@@ -83,16 +83,16 @@ export const Combobox: React.FC<ComboboxProps> = ({
                 onClick={() => handleSelect(opt)}
                 className={`flex items-center justify-between px-3.5 py-1.5 cursor-pointer font-mono transition-colors ${
                   opt === value
-                    ? 'bg-stone-100 text-stone-900 font-medium'
-                    : 'text-stone-700 hover:bg-stone-50 hover:text-stone-900'
+                    ? 'bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100 font-medium'
+                    : 'text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-[#282624] hover:text-stone-900 dark:hover:text-stone-100'
                 }`}
               >
                 <span className="truncate">{opt}</span>
-                {opt === value && <Check className="w-3.5 h-3.5 text-stone-800 ml-2 shrink-0" />}
+                {opt === value && <Check className="w-3.5 h-3.5 text-stone-800 dark:text-stone-200 ml-2 shrink-0" />}
               </div>
             ))
           ) : (
-            <div className="px-3.5 py-2 text-stone-400 text-xs">
+            <div className="px-3.5 py-2 text-stone-400 dark:text-stone-500 text-xs">
               {inputValue ? `直接使用: "${inputValue}"` : '可直接手动输入'}
             </div>
           )}
