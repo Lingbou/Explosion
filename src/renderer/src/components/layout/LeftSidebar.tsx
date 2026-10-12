@@ -15,7 +15,9 @@ import {
   ChevronDown,
   ChevronRight,
   Layers,
-  Folder
+  Folder,
+  AlertTriangle,
+  GripVertical
 } from 'lucide-react'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useLibraryStore } from '../../store/libraryStore'
@@ -31,6 +33,16 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
     projectTitle,
     setProjectTitle,
     chapters,
+    volumes,
+    selectedVolume,
+    collapsedVolumes,
+    toggleVolumeCollapse,
+    setSelectedVolume,
+    createVolume,
+    renameVolume,
+    deleteVolume,
+    reorderChapters,
+    moveChapter,
     activeChapterId,
     activeDocumentType,
     activeStoryFile,
@@ -56,8 +68,28 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
     openLibraryModal
   } = useLibraryStore()
 
+  // 章节重命名
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null)
   const [editTitleValue, setEditTitleValue] = useState('')
+
+  // 卷重命名与新建
+  const [editingVolumeName, setEditingVolumeName] = useState<string | null>(null)
+  const [editVolumeTitleValue, setEditVolumeTitleValue] = useState('')
+  const [isCreatingVolume, setIsCreatingVolume] = useState(false)
+  const [newVolumeNameInput, setNewVolumeNameInput] = useState('')
+
+  // 卷删除确认与内容保护弹窗
+  const [volumeToDelete, setVolumeToDelete] = useState<{
+    name: string
+    count: number
+  } | null>(null)
+
+  // 拖拽指示
+  const [dragOverTarget, setDragOverTarget] = useState<{
+    chapterId?: string
+    volume?: string
+    position?: 'before' | 'after' | 'volume-header'
+  } | null>(null)
 
   const [editingStoryRelPath, setEditingStoryRelPath] = useState<string | null>(null)
   const [editStoryTitleValue, setEditStoryTitleValue] = useState('')
@@ -101,6 +133,39 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
     setEditingChapterId(null)
   }
 
+  const handleStartVolumeRename = (volName: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingVolumeName(volName)
+    setEditVolumeTitleValue(volName)
+  }
+
+  const handleFinishVolumeRename = async (oldName: string) => {
+    if (editVolumeTitleValue.trim() && editVolumeTitleValue.trim() !== oldName) {
+      await renameVolume(oldName, editVolumeTitleValue.trim())
+    }
+    setEditingVolumeName(null)
+  }
+
+  const handleFinishCreateVolume = async () => {
+    if (newVolumeNameInput.trim()) {
+      await createVolume(newVolumeNameInput.trim())
+    }
+    setIsCreatingVolume(false)
+    setNewVolumeNameInput('')
+  }
+
+  const handleRequestDeleteVolume = (volName: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const count = chapters.filter((c) => c.volume === volName).length
+    setVolumeToDelete({ name: volName, count })
+  }
+
+  const handleConfirmDeleteVolume = async (keepChapters: boolean) => {
+    if (!volumeToDelete) return
+    await deleteVolume(volumeToDelete.name, keepChapters)
+    setVolumeToDelete(null)
+  }
+
   const handleStartStoryRename = (relPath: string, currentTitle: string, e: React.MouseEvent) => {
     e.stopPropagation()
     setEditingStoryRelPath(relPath)
@@ -114,7 +179,6 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
     setEditingStoryRelPath(null)
   }
 
-  // Create new story file without window.prompt: instant on-the-fly creation
   const handleCreateStory = async (type: 'outline' | 'character', e: React.MouseEvent) => {
     e.stopPropagation()
     if (type === 'outline') {
@@ -125,19 +189,257 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
     await createStoryFile(type)
   }
 
-  // Group chapters by volume
+  // 卷列表与章节分组
+  const allVolumeNames = React.useMemo(() => {
+    const setNames = new Set<string>(volumes)
+    for (const ch of chapters) {
+      if (ch.volume) setNames.add(ch.volume)
+    }
+    return Array.from(setNames).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+    )
+  }, [volumes, chapters])
+
+  const hasVolumes = allVolumeNames.length > 0
+
   const volumeGroups = React.useMemo(() => {
     const groups: Record<string, typeof chapters> = {}
+    for (const v of allVolumeNames) {
+      groups[v] = []
+    }
     for (const ch of chapters) {
-      const vol = ch.volume || '正文'
-      if (!groups[vol]) groups[vol] = []
-      groups[vol].push(ch)
+      if (ch.volume) {
+        if (!groups[ch.volume]) groups[ch.volume] = []
+        groups[ch.volume].push(ch)
+      }
     }
     return groups
+  }, [allVolumeNames, chapters])
+
+  const unassignedChapters = React.useMemo(() => {
+    return chapters.filter((c) => !c.volume)
   }, [chapters])
 
-  const volumeNames = Object.keys(volumeGroups)
-  const hasMultipleVolumes = volumeNames.length > 1 || (volumeNames.length === 1 && volumeNames[0] !== '正文')
+  // HTML5 DnD 处理逻辑
+  const handleDragStart = (
+    e: React.DragEvent,
+    ch: { id: string; filename: string; volume?: string }
+  ) => {
+    e.dataTransfer.setData(
+      'application/json',
+      JSON.stringify({
+        chapterId: ch.id,
+        filename: ch.filename,
+        sourceVolume: ch.volume
+      })
+    )
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragOverChapter = (
+    e: React.DragEvent,
+    targetChapter: { id: string; volume?: string }
+  ) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'move'
+    const rect = e.currentTarget.getBoundingClientRect()
+    const isUpper = e.clientY - rect.top < rect.height / 2
+    setDragOverTarget({
+      chapterId: targetChapter.id,
+      volume: targetChapter.volume,
+      position: isUpper ? 'before' : 'after'
+    })
+  }
+
+  const handleDropOnChapter = async (
+    e: React.DragEvent,
+    targetChapter: { id: string; filename: string; volume?: string }
+  ) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const targetPos = dragOverTarget?.position || 'after'
+    setDragOverTarget(null)
+
+    const raw = e.dataTransfer.getData('application/json')
+    if (!raw) return
+    try {
+      const data = JSON.parse(raw) as {
+        chapterId: string
+        filename: string
+        sourceVolume?: string
+      }
+
+      if (data.chapterId === targetChapter.id) return
+
+      const targetVol = targetChapter.volume
+      const containerChapters = targetVol
+        ? (volumeGroups[targetVol] || [])
+        : unassignedChapters
+
+      const targetIdx = containerChapters.findIndex((c) => c.id === targetChapter.id)
+      if (targetIdx === -1) return
+
+      const insertIndex = targetPos === 'before' ? targetIdx : targetIdx + 1
+
+      if (data.sourceVolume === targetVol) {
+        // 同卷内重排
+        const filenames = containerChapters.map((c) => c.filename)
+        const fromIdx = filenames.indexOf(data.filename)
+        if (fromIdx !== -1) {
+          filenames.splice(fromIdx, 1)
+          const finalInsert = targetPos === 'before' ? targetIdx : (fromIdx < targetIdx ? targetIdx : targetIdx + 1)
+          filenames.splice(finalInsert, 0, data.filename)
+          await reorderChapters(targetVol, filenames)
+        }
+      } else {
+        // 跨卷移动
+        await moveChapter({
+          chapterId: data.chapterId,
+          filename: data.filename,
+          sourceVolume: data.sourceVolume,
+          targetVolume: targetVol,
+          targetIndex: insertIndex
+        })
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleDragOverVolumeHeader = (e: React.DragEvent, volumeName: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverTarget({
+      volume: volumeName,
+      position: 'volume-header'
+    })
+  }
+
+  const handleDropOnVolumeHeader = async (e: React.DragEvent, volumeName: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOverTarget(null)
+
+    const raw = e.dataTransfer.getData('application/json')
+    if (!raw) return
+    try {
+      const data = JSON.parse(raw) as {
+        chapterId: string
+        filename: string
+        sourceVolume?: string
+      }
+
+      if (data.sourceVolume === volumeName) return
+
+      const volChapters = volumeGroups[volumeName] || []
+      await moveChapter({
+        chapterId: data.chapterId,
+        filename: data.filename,
+        sourceVolume: data.sourceVolume,
+        targetVolume: volumeName,
+        targetIndex: volChapters.length
+      })
+    } catch {
+      // ignore
+    }
+  }
+
+  // 章节条目渲染函数
+  const renderChapterItem = (
+    ch: typeof chapters[0],
+    index: number,
+    opts?: { isInsideVolume?: boolean }
+  ) => {
+    const stats = countTextStats(ch.content)
+    const isActive = activeDocumentType === 'chapter' && ch.id === activeChapterId
+    const isEditing = ch.id === editingChapterId
+    const isDropBefore = dragOverTarget?.chapterId === ch.id && dragOverTarget?.position === 'before'
+    const isDropAfter = dragOverTarget?.chapterId === ch.id && dragOverTarget?.position === 'after'
+
+    return (
+      <div
+        key={ch.id}
+        draggable={!isEditing}
+        onDragStart={(e) => handleDragStart(e, ch)}
+        onDragOver={(e) => handleDragOverChapter(e, ch)}
+        onDragLeave={() => {
+          if (dragOverTarget?.chapterId === ch.id) {
+            setDragOverTarget(null)
+          }
+        }}
+        onDrop={(e) => handleDropOnChapter(e, ch)}
+        onClick={() => selectChapter(ch.id)}
+        onDoubleClick={(e) => handleStartRename(ch.id, ch.title, e)}
+        className={`group relative flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition-all ${
+          isActive
+            ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/60'
+            : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
+        } ${isDropBefore ? 'border-t-2 border-stone-800' : ''} ${
+          isDropAfter ? 'border-b-2 border-stone-800' : ''
+        } ${opts?.isInsideVolume ? 'ml-3' : ''}`}
+      >
+        <div className="flex items-center gap-1.5 truncate flex-1 mr-1">
+          <GripVertical className="w-3 h-3 text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 cursor-grab active:cursor-grabbing" />
+          <FileText
+            className={`w-3.5 h-3.5 shrink-0 ${
+              isActive ? 'text-stone-900' : 'text-stone-400'
+            }`}
+          />
+          {isEditing ? (
+            <input
+              type="text"
+              value={editTitleValue}
+              onChange={(e) => setEditTitleValue(e.target.value)}
+              onBlur={() => handleFinishRename(ch.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleFinishRename(ch.id)
+                if (e.key === 'Escape') setEditingChapterId(null)
+              }}
+              autoFocus
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white border border-stone-400 rounded px-1 text-xs text-stone-900 w-full focus:outline-none"
+            />
+          ) : (
+            <span className="truncate">{ch.title || `第 ${index + 1} 章`}</span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {stats.chineseChars > 0 && !isEditing && (
+            <span className="text-[10px] text-stone-400 font-mono group-hover:text-stone-500">
+              {stats.chineseChars}
+            </span>
+          )}
+
+          {!isEditing && (
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={(e) => handleStartRename(ch.id, ch.title, e)}
+                className="p-0.5 text-stone-400 hover:text-stone-700 rounded"
+                title="重命名章节"
+              >
+                <Edit2 className="w-3 h-3" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (window.confirm(`确定要删除章节《${ch.title}》吗？`)) {
+                    deleteChapter(ch.id)
+                  }
+                }}
+                className="p-0.5 text-stone-400 hover:text-rose-600 rounded"
+                title="删除章节"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <aside
@@ -220,15 +522,27 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
           )}
         </div>
 
-        {/* Quick Add Chapter Button when project is open */}
+        {/* Quick Add Chapter & Add Volume when project is open */}
         {projectPath && (
-          <button
-            onClick={() => addChapter()}
-            className="p-1 rounded text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors shrink-0"
-            title="新建章节"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button
+              onClick={() => {
+                setIsCreatingVolume(true)
+                setNewVolumeNameInput(`第${allVolumeNames.length + 1}卷`)
+              }}
+              className="p-1 rounded text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors"
+              title="新建分卷"
+            >
+              <FolderPlus className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => addChapter()}
+              className="p-1 rounded text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors"
+              title="新建章节（落在当前选中的卷）"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
         )}
       </div>
 
@@ -262,7 +576,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
           </div>
         )}
 
-        {/* Chapters Section (Multi-Volume Support) */}
+        {/* Chapters Section (Volume-Tree or Flat Fallback) */}
         {projectPath && (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between px-2 mb-1">
@@ -270,160 +584,301 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                 <FileText className="w-3.5 h-3.5 text-stone-400" />
                 <span>手稿 ({chapters.length})</span>
               </span>
-              <button
-                onClick={() => addChapter()}
-                className="p-1 rounded text-stone-500 hover:text-stone-900 hover:bg-stone-200/60 transition-colors"
-                title="新建下一章"
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex items-center gap-0.5">
+                <button
+                  onClick={() => {
+                    setIsCreatingVolume(true)
+                    setNewVolumeNameInput(`第${allVolumeNames.length + 1}卷`)
+                  }}
+                  className="p-1 rounded text-stone-500 hover:text-stone-900 hover:bg-stone-200/60 transition-colors"
+                  title="新建分卷"
+                >
+                  <FolderPlus className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => addChapter()}
+                  className="p-1 rounded text-stone-500 hover:text-stone-900 hover:bg-stone-200/60 transition-colors"
+                  title="新建下一章"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
-            {hasMultipleVolumes ? (
-              // Multi-volume grouped view
-              <div className="space-y-2">
-                {volumeNames.map((volName) => (
-                  <div key={volName} className="space-y-0.5">
-                    <div className="px-2 py-1 text-[10px] font-medium text-stone-400 flex items-center gap-1">
-                      <Layers className="w-3 h-3 text-stone-400" />
-                      <span>{volName}</span>
-                    </div>
-
-                    {volumeGroups[volName].map((ch) => {
-                      const stats = countTextStats(ch.content)
-                      const isActive = activeDocumentType === 'chapter' && ch.id === activeChapterId
-                      const isEditing = ch.id === editingChapterId
-
-                      return (
-                        <div
-                          key={ch.id}
-                          onClick={() => selectChapter(ch.id)}
-                          onDoubleClick={(e) => handleStartRename(ch.id, ch.title, e)}
-                          className={`group flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
-                            isActive
-                              ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/60'
-                              : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 truncate flex-1 mr-1">
-                            <span className="truncate">{ch.title}</span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {stats.chineseChars > 0 && !isEditing && (
-                              <span className="text-[10px] text-stone-400 font-mono group-hover:text-stone-500">
-                                {stats.chineseChars}
-                              </span>
-                            )}
-                            {!isEditing && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  deleteChapter(ch.id)
-                                }}
-                                className="p-0.5 text-stone-400 hover:text-rose-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                                title="删除章节"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ))}
+            {/* Inline Volume Creation Input */}
+            {isCreatingVolume && (
+              <div className="px-2 py-1 bg-white border border-stone-300 rounded-md shadow-2xs flex items-center gap-1.5 mb-1.5">
+                <Layers className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                <input
+                  type="text"
+                  value={newVolumeNameInput}
+                  onChange={(e) => setNewVolumeNameInput(e.target.value)}
+                  onBlur={handleFinishCreateVolume}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleFinishCreateVolume()
+                    if (e.key === 'Escape') {
+                      setIsCreatingVolume(false)
+                      setNewVolumeNameInput('')
+                    }
+                  }}
+                  autoFocus
+                  placeholder="输入分卷名称..."
+                  className="bg-transparent text-xs text-stone-900 w-full focus:outline-none"
+                />
               </div>
-            ) : (
-              // Linear flat chapter list
-              <div className="space-y-0.5">
-                {chapters.map((ch, index) => {
-                  const stats = countTextStats(ch.content)
-                  const isActive = activeDocumentType === 'chapter' && ch.id === activeChapterId
-                  const isEditing = ch.id === editingChapterId
+            )}
+
+            {hasVolumes ? (
+              // Multi-volume tree view
+              <div className="space-y-2">
+                {allVolumeNames.map((volName) => {
+                  const volChapters = volumeGroups[volName] || []
+                  const isCollapsed = collapsedVolumes[volName] ?? false
+                  const isSelected = selectedVolume === volName
+                  const isEditingVol = editingVolumeName === volName
+                  const isDragTargetHeader =
+                    dragOverTarget?.volume === volName &&
+                    dragOverTarget?.position === 'volume-header'
+
+                  const totalChars = volChapters.reduce(
+                    (acc, c) => acc + countTextStats(c.content).chineseChars,
+                    0
+                  )
 
                   return (
                     <div
-                      key={ch.id}
-                      onClick={() => selectChapter(ch.id)}
-                      onDoubleClick={(e) => handleStartRename(ch.id, ch.title, e)}
-                      className={`group flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
-                        isActive
-                          ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/60'
-                          : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
+                      key={volName}
+                      className={`space-y-0.5 rounded-lg transition-colors ${
+                        isSelected ? 'bg-stone-100/60 p-1' : 'p-0.5'
                       }`}
                     >
-                      <div className="flex items-center gap-2 truncate flex-1 mr-1">
-                        <FileText
-                          className={`w-3.5 h-3.5 shrink-0 ${
-                            isActive ? 'text-stone-900' : 'text-stone-400'
-                          }`}
-                        />
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            value={editTitleValue}
-                            onChange={(e) => setEditTitleValue(e.target.value)}
-                            onBlur={() => handleFinishRename(ch.id)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleFinishRename(ch.id)
-                              if (e.key === 'Escape') setEditingChapterId(null)
+                      {/* Volume Header Bar */}
+                      <div
+                        onClick={() => {
+                          setSelectedVolume(volName)
+                          toggleVolumeCollapse(volName)
+                        }}
+                        onDragOver={(e) => handleDragOverVolumeHeader(e, volName)}
+                        onDragLeave={() => {
+                          if (dragOverTarget?.volume === volName) {
+                            setDragOverTarget(null)
+                          }
+                        }}
+                        onDrop={(e) => handleDropOnVolumeHeader(e, volName)}
+                        className={`group flex items-center justify-between px-2 py-1.5 text-xs text-stone-700 hover:bg-stone-200/50 rounded-md cursor-pointer transition-colors ${
+                          isDragTargetHeader
+                            ? 'bg-amber-100/70 border-2 border-dashed border-amber-500'
+                            : ''
+                        }`}
+                        title="点击选择该卷并展开/收起；可将章节拖入此卷"
+                      >
+                        <div className="flex items-center gap-1.5 truncate flex-1 mr-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleVolumeCollapse(volName)
                             }}
-                            autoFocus
-                            onClick={(e) => e.stopPropagation()}
-                            className="bg-white border border-stone-400 rounded px-1 text-xs text-stone-900 w-full focus:outline-none"
-                          />
-                        ) : (
-                          <span className="truncate">{ch.title || `第 ${index + 1} 章`}</span>
-                        )}
-                      </div>
+                            className="p-0.5 text-stone-400 hover:text-stone-700 rounded"
+                          >
+                            {isCollapsed ? (
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                          <Layers className="w-3.5 h-3.5 text-stone-500 shrink-0" />
 
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {stats.chineseChars > 0 && !isEditing && (
-                          <span className="text-[10px] text-stone-400 font-mono group-hover:text-stone-500">
-                            {stats.chineseChars}
-                          </span>
-                        )}
-
-                        {!isEditing && (
-                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={(e) => handleStartRename(ch.id, ch.title, e)}
-                              className="p-0.5 text-stone-400 hover:text-stone-700 rounded"
-                              title="重命名章节"
-                            >
-                              <Edit2 className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                deleteChapter(ch.id)
+                          {isEditingVol ? (
+                            <input
+                              type="text"
+                              value={editVolumeTitleValue}
+                              onChange={(e) => setEditVolumeTitleValue(e.target.value)}
+                              onBlur={() => handleFinishVolumeRename(volName)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleFinishVolumeRename(volName)
+                                if (e.key === 'Escape') setEditingVolumeName(null)
                               }}
-                              className="p-0.5 text-stone-400 hover:text-rose-600 rounded"
-                              title="删除章节"
+                              autoFocus
+                              onClick={(e) => e.stopPropagation()}
+                              className="bg-white border border-stone-400 rounded px-1 text-xs text-stone-900 w-full focus:outline-none"
+                            />
+                          ) : (
+                            <span
+                              onDoubleClick={(e) => handleStartVolumeRename(volName, e)}
+                              className="font-medium text-xs text-stone-800 truncate"
                             >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        )}
+                              {volName}
+                            </span>
+                          )}
+
+                          <span className="text-[10px] text-stone-400 font-mono">
+                            ({volChapters.length})
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          {totalChars > 0 && !isEditingVol && (
+                            <span className="text-[10px] text-stone-400 font-mono group-hover:text-stone-500 mr-0.5">
+                              {totalChars}字
+                            </span>
+                          )}
+
+                          {!isEditingVol && (
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  addChapter(undefined, volName)
+                                }}
+                                className="p-0.5 text-stone-400 hover:text-stone-700 rounded"
+                                title="在此卷下新建章节"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={(e) => handleStartVolumeRename(volName, e)}
+                                className="p-0.5 text-stone-400 hover:text-stone-700 rounded"
+                                title="重命名卷"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={(e) => handleRequestDeleteVolume(volName, e)}
+                                className="p-0.5 text-stone-400 hover:text-rose-600 rounded"
+                                title="删除卷 (内容保护)"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
+
+                      {/* Chapters inside this volume */}
+                      {!isCollapsed && (
+                        <div className="space-y-0.5 pt-0.5">
+                          {volChapters.length === 0 ? (
+                            <div
+                              onClick={() => addChapter(undefined, volName)}
+                              className="px-3 py-1.5 ml-3 text-[11px] text-stone-400 italic hover:text-stone-600 cursor-pointer rounded hover:bg-stone-200/40"
+                            >
+                              暂无章节，点击 + 新建
+                            </div>
+                          ) : (
+                            volChapters.map((ch, idx) =>
+                              renderChapterItem(ch, idx, { isInsideVolume: true })
+                            )
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
+
+                {/* Unassigned / Root Chapters if any */}
+                {unassignedChapters.length > 0 && (
+                  <div className="space-y-0.5 pt-1 border-t border-stone-200/50">
+                    <div className="px-2 py-1 text-[10px] font-medium text-stone-400 flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <FileText className="w-3 h-3 text-stone-400" />
+                        <span>未分卷章节 ({unassignedChapters.length})</span>
+                      </div>
+                      <button
+                        onClick={() => addChapter(undefined, undefined)}
+                        className="p-0.5 text-stone-400 hover:text-stone-700 rounded"
+                        title="新建未分卷章节"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                    {unassignedChapters.map((ch, idx) =>
+                      renderChapterItem(ch, idx, { isInsideVolume: false })
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Linear flat chapter list (Zero-migration compatibility for legacy flat projects)
+              <div className="space-y-0.5">
+                {chapters.map((ch, index) => renderChapterItem(ch, index, { isInsideVolume: false }))}
               </div>
             )}
           </div>
         )}
 
+        {/* Content Protection Modal for Volume Deletion */}
+        {volumeToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-100 font-sans">
+            <div className="bg-white rounded-xl shadow-2xl border border-stone-200 max-w-sm w-full p-4.5 space-y-3.5">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-full bg-amber-50 text-amber-600 shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-stone-900">
+                    删除分卷《{volumeToDelete.name}》
+                  </h3>
+                  <p className="text-xs text-stone-500 mt-1 leading-relaxed">
+                    {volumeToDelete.count > 0 ? (
+                      <>
+                        该卷下包含{' '}
+                        <span className="font-semibold text-stone-800">
+                          {volumeToDelete.count}
+                        </span>{' '}
+                        个章节手稿。为保障小说内容安全，请选择删除方式：
+                      </>
+                    ) : (
+                      '该卷下暂无章节手稿，确定删除该空卷吗？'
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-1">
+                {volumeToDelete.count > 0 ? (
+                  <>
+                    <button
+                      onClick={() => handleConfirmDeleteVolume(true)}
+                      className="w-full py-2 px-3 rounded-lg bg-stone-900 text-white text-xs font-medium hover:bg-stone-800 flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                    >
+                      <span>保留手稿并删除卷 (推荐)</span>
+                    </button>
+                    <button
+                      onClick={() => handleConfirmDeleteVolume(false)}
+                      className="w-full py-1.5 px-3 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 text-xs font-medium transition-colors cursor-pointer"
+                    >
+                      <span>彻底删除卷及所有章节手稿</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => handleConfirmDeleteVolume(false)}
+                    className="w-full py-2 px-3 rounded-lg bg-stone-900 text-white text-xs font-medium hover:bg-stone-800 text-center transition-colors shadow-2xs cursor-pointer"
+                  >
+                    确认删除
+                  </button>
+                )}
+                <button
+                  onClick={() => setVolumeToDelete(null)}
+                  className="w-full py-1.5 px-3 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 text-xs font-medium transition-colors cursor-pointer"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
         {/* Story Bible Section (本作设定 - 真实目录树状结构) */}
         {projectPath && (
-          <div className="border-t border-stone-200/60 pt-3 space-y-1">
+          <div className="border-t border-stone-200/60 dark:border-stone-800 pt-3 space-y-1">
             <div
               onClick={() => setIsStoryBibleOpen(!isStoryBibleOpen)}
-              className="flex items-center justify-between px-2 mb-1 cursor-pointer text-stone-500 hover:text-stone-800 transition-colors"
+              className="flex items-center justify-between px-2 mb-1 cursor-pointer text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 transition-colors"
             >
               <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider">
-                <BookMarked className="w-3.5 h-3.5 text-stone-500" />
+                <BookMarked className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400" />
                 <span>本作设定 (Story Bible)</span>
               </div>
               {isStoryBibleOpen ? (
@@ -439,7 +894,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                 <div className="space-y-0.5">
                   <div
                     onClick={() => setIsOutlinesOpen(!isOutlinesOpen)}
-                    className="flex items-center justify-between px-2 py-1.5 text-xs text-stone-600 hover:bg-stone-200/40 rounded cursor-pointer transition-colors"
+                    className="flex items-center justify-between px-2 py-1.5 text-xs text-stone-600 dark:text-stone-300 hover:bg-stone-200/40 dark:hover:bg-stone-800/60 rounded cursor-pointer transition-colors"
                   >
                     <div className="flex items-center gap-1.5 truncate">
                       {isOutlinesOpen ? (
@@ -447,16 +902,16 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                       ) : (
                         <ChevronRight className="w-3.5 h-3.5 text-stone-400 shrink-0" />
                       )}
-                      <Folder className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                      <span className="font-medium text-xs text-stone-800">大纲规划</span>
-                      <span className="text-[10px] text-stone-400 font-mono">
+                      <Folder className="w-3.5 h-3.5 text-amber-600 dark:text-amber-500 shrink-0" />
+                      <span className="font-medium text-xs text-stone-800 dark:text-stone-200">大纲规划</span>
+                      <span className="text-[10px] text-stone-400 dark:text-stone-500 font-mono">
                         ({storyBible?.outlines?.length || 0})
                       </span>
                     </div>
 
                     <button
                       onClick={(e) => handleCreateStory('outline', e)}
-                      className="p-0.5 hover:text-stone-900 text-stone-500 hover:bg-stone-200 rounded"
+                      className="p-0.5 hover:text-stone-900 dark:hover:text-stone-100 text-stone-500 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700 rounded cursor-pointer"
                       title="新建大纲文件"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -466,7 +921,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                   {isOutlinesOpen && (
                     <div className="pl-5 space-y-0.5">
                       {storyBible?.outlines?.length === 0 ? (
-                        <div className="px-2 py-1 text-[11px] text-stone-400">
+                        <div className="px-2 py-1 text-[11px] text-stone-400 dark:text-stone-500">
                           暂无大纲，点击上方 + 新建
                         </div>
                       ) : (
@@ -483,12 +938,12 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                               onDoubleClick={(e) => handleStartStoryRename(outline.relativePath, outline.title, e)}
                               className={`group flex items-center justify-between px-2 py-1 rounded-md text-xs cursor-pointer transition-colors ${
                                 isActive
-                                  ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/60'
-                                  : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
+                                  ? 'bg-white dark:bg-[#252321] text-stone-900 dark:text-stone-100 font-medium shadow-2xs border border-stone-200/60 dark:border-stone-700'
+                                  : 'text-stone-600 dark:text-stone-400 hover:bg-stone-200/50 dark:hover:bg-stone-800/60 hover:text-stone-900 dark:hover:text-stone-200'
                               }`}
                             >
                               <div className="flex items-center gap-1.5 truncate flex-1 mr-1">
-                                <FileText className="w-3 h-3 text-amber-700 shrink-0" />
+                                <FileText className="w-3 h-3 text-amber-700 dark:text-amber-500 shrink-0" />
                                 {isEditing ? (
                                   <input
                                     type="text"
@@ -501,7 +956,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                                     }}
                                     autoFocus
                                     onClick={(e) => e.stopPropagation()}
-                                    className="bg-white border border-stone-400 rounded px-1 text-xs text-stone-900 w-full focus:outline-none"
+                                    className="bg-white dark:bg-[#181716] border border-stone-400 dark:border-stone-600 rounded px-1 text-xs text-stone-900 dark:text-stone-100 w-full focus:outline-none"
                                   />
                                 ) : (
                                   <span className="truncate text-[11px]">{outline.title}</span>
@@ -512,7 +967,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button
                                     onClick={(e) => handleStartStoryRename(outline.relativePath, outline.title, e)}
-                                    className="p-0.5 text-stone-400 hover:text-stone-700 rounded"
+                                    className="p-0.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded cursor-pointer"
                                     title="重命名大纲"
                                   >
                                     <Edit2 className="w-3 h-3" />
@@ -524,7 +979,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                                         deleteStoryFile(outline.relativePath)
                                       }
                                     }}
-                                    className="p-0.5 text-stone-400 hover:text-rose-600 rounded"
+                                    className="p-0.5 text-stone-400 hover:text-rose-600 rounded cursor-pointer"
                                     title="删除大纲"
                                   >
                                     <Trash2 className="w-3 h-3" />
@@ -543,7 +998,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                 <div className="space-y-0.5">
                   <div
                     onClick={() => setIsCharactersOpen(!isCharactersOpen)}
-                    className="flex items-center justify-between px-2 py-1.5 text-xs text-stone-600 hover:bg-stone-200/40 rounded cursor-pointer transition-colors"
+                    className="flex items-center justify-between px-2 py-1.5 text-xs text-stone-600 dark:text-stone-300 hover:bg-stone-200/40 dark:hover:bg-stone-800/60 rounded cursor-pointer transition-colors"
                   >
                     <div className="flex items-center gap-1.5 truncate">
                       {isCharactersOpen ? (
@@ -551,16 +1006,16 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                       ) : (
                         <ChevronRight className="w-3.5 h-3.5 text-stone-400 shrink-0" />
                       )}
-                      <Folder className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      <span className="font-medium text-xs text-stone-800">人物档案</span>
-                      <span className="text-[10px] text-stone-400 font-mono">
+                      <Folder className="w-3.5 h-3.5 text-blue-600 dark:text-blue-500 shrink-0" />
+                      <span className="font-medium text-xs text-stone-800 dark:text-stone-200">人物档案</span>
+                      <span className="text-[10px] text-stone-400 dark:text-stone-500 font-mono">
                         ({storyBible?.characters?.length || 0})
                       </span>
                     </div>
 
                     <button
                       onClick={(e) => handleCreateStory('character', e)}
-                      className="p-0.5 hover:text-stone-900 text-stone-500 hover:bg-stone-200 rounded"
+                      className="p-0.5 hover:text-stone-900 dark:hover:text-stone-100 text-stone-500 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700 rounded cursor-pointer"
                       title="新建人物小传"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -570,7 +1025,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                   {isCharactersOpen && (
                     <div className="pl-5 space-y-0.5">
                       {storyBible?.characters?.length === 0 ? (
-                        <div className="px-2 py-1 text-[11px] text-stone-400">
+                        <div className="px-2 py-1 text-[11px] text-stone-400 dark:text-stone-500">
                           暂无人物，点击上方 + 新建
                         </div>
                       ) : (
@@ -587,12 +1042,12 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                               onDoubleClick={(e) => handleStartStoryRename(char.relativePath, char.title, e)}
                               className={`group flex items-center justify-between px-2 py-1 rounded-md text-xs cursor-pointer transition-colors ${
                                 isActive
-                                  ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/60'
-                                  : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
+                                  ? 'bg-white dark:bg-[#252321] text-stone-900 dark:text-stone-100 font-medium shadow-2xs border border-stone-200/60 dark:border-stone-700'
+                                  : 'text-stone-600 dark:text-stone-400 hover:bg-stone-200/50 dark:hover:bg-stone-800/60 hover:text-stone-900 dark:hover:text-stone-200'
                               }`}
                             >
                               <div className="flex items-center gap-1.5 truncate flex-1 mr-1">
-                                <User className="w-3 h-3 text-blue-600 shrink-0" />
+                                <User className="w-3 h-3 text-blue-600 dark:text-blue-400 shrink-0" />
                                 {isEditing ? (
                                   <input
                                     type="text"
@@ -605,7 +1060,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                                     }}
                                     autoFocus
                                     onClick={(e) => e.stopPropagation()}
-                                    className="bg-white border border-stone-400 rounded px-1 text-xs text-stone-900 w-full focus:outline-none"
+                                    className="bg-white dark:bg-[#181716] border border-stone-400 dark:border-stone-600 rounded px-1 text-xs text-stone-900 dark:text-stone-100 w-full focus:outline-none"
                                   />
                                 ) : (
                                   <span className="truncate text-[11px]">{char.title}</span>
@@ -616,7 +1071,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button
                                     onClick={(e) => handleStartStoryRename(char.relativePath, char.title, e)}
-                                    className="p-0.5 text-stone-400 hover:text-stone-700 rounded"
+                                    className="p-0.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded cursor-pointer"
                                     title="重命名人物"
                                   >
                                     <Edit2 className="w-3 h-3" />
@@ -628,7 +1083,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                                         deleteStoryFile(char.relativePath)
                                       }
                                     }}
-                                    className="p-0.5 text-stone-400 hover:text-rose-600 rounded"
+                                    className="p-0.5 text-stone-400 hover:text-rose-600 rounded cursor-pointer"
                                     title="删除人物档案"
                                   >
                                     <Trash2 className="w-3 h-3" />
@@ -650,13 +1105,13 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                     className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
                       activeDocumentType === 'story' &&
                       activeStoryFile?.relativePath === storyBible.ledger.relativePath
-                        ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/60'
-                        : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
+                        ? 'bg-white dark:bg-[#252321] text-stone-900 dark:text-stone-100 font-medium shadow-2xs border border-stone-200/60 dark:border-stone-700'
+                        : 'text-stone-600 dark:text-stone-400 hover:bg-stone-200/50 dark:hover:bg-stone-800/60 hover:text-stone-900 dark:hover:text-stone-200'
                     }`}
                   >
                     <div className="flex items-center gap-1.5 truncate">
-                      <Bookmark className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                      <span className="font-medium text-xs text-stone-800">暗线</span>
+                      <Bookmark className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                      <span className="font-medium text-xs text-stone-800 dark:text-stone-200">暗线</span>
                     </div>
                   </div>
                 )}
@@ -667,16 +1122,16 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
       </div>
 
       {/* Bottom Pinned Library Entry (Ultra compact) */}
-      <div className="p-2 border-t border-stone-200 bg-white/70 shrink-0">
+      <div className="p-2 border-t border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-[#1a1918]/80 shrink-0">
         <div
           onClick={openLibraryModal}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-stone-100/90 cursor-pointer transition-colors text-xs text-stone-700 border border-transparent hover:border-stone-200"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-stone-100/90 dark:hover:bg-stone-800/90 cursor-pointer transition-colors text-xs text-stone-700 dark:text-stone-300 border border-transparent hover:border-stone-200 dark:hover:border-stone-700"
           title="点击打开资料库管理与阅读弹层"
         >
           <div className="flex items-center gap-2 truncate">
-            <BookOpen className="w-3.5 h-3.5 text-stone-600 shrink-0" />
-            <span className="font-medium text-xs text-stone-800">资料库</span>
-            <span className="text-[10px] text-stone-400 font-mono px-1.5 py-0.2 rounded-full bg-stone-100 border border-stone-200">
+            <BookOpen className="w-3.5 h-3.5 text-stone-600 dark:text-stone-400 shrink-0" />
+            <span className="font-medium text-xs text-stone-800 dark:text-stone-200">资料库</span>
+            <span className="text-[10px] text-stone-400 dark:text-stone-500 font-mono px-1.5 py-0.2 rounded-full bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700">
               {books.length}
             </span>
           </div>
@@ -687,14 +1142,14 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
           >
             <button
               onClick={importBooks}
-              className="p-1 text-stone-400 hover:text-stone-700 rounded hover:bg-stone-200/60 transition-colors"
+              className="p-1 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded hover:bg-stone-200/60 dark:hover:bg-stone-800 transition-colors cursor-pointer"
               title="导入外部 TXT 长篇小说"
             >
               <Upload className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={openFolder}
-              className="p-1 text-stone-400 hover:text-stone-700 rounded hover:bg-stone-200/60 transition-colors"
+              className="p-1 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded hover:bg-stone-200/60 dark:hover:bg-stone-800 transition-colors cursor-pointer"
               title="在系统文件管理器中打开藏书目录"
             >
               <FolderOpen className="w-3.5 h-3.5" />

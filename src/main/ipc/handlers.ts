@@ -138,19 +138,22 @@ export function registerIpcHandlers(): void {
         projectPath,
         chapterId,
         oldFilename,
-        newTitle
+        newTitle,
+        volume
       }: {
         projectPath: string
         chapterId: string
         oldFilename: string
         newTitle: string
+        volume?: string
       }
     ) => {
       return globalProjectManager.renameProjectChapter(
         projectPath,
         chapterId,
         oldFilename,
-        newTitle
+        newTitle,
+        volume
       )
     }
   )
@@ -159,9 +162,75 @@ export function registerIpcHandlers(): void {
     IPC_CHANNELS.PROJECT_DELETE_CHAPTER,
     async (
       _event,
-      { projectPath, filename }: { projectPath: string; filename: string }
+      { projectPath, filename, volume }: { projectPath: string; filename: string; volume?: string }
     ) => {
-      return globalProjectManager.deleteProjectChapter(projectPath, filename)
+      return globalProjectManager.deleteProjectChapter(projectPath, filename, volume)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_CREATE_VOLUME,
+    async (_event, { projectPath, volumeName }: { projectPath: string; volumeName: string }) => {
+      return globalProjectManager.createVolume(projectPath, volumeName)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_RENAME_VOLUME,
+    async (
+      _event,
+      {
+        projectPath,
+        oldVolumeName,
+        newVolumeName
+      }: { projectPath: string; oldVolumeName: string; newVolumeName: string }
+    ) => {
+      return globalProjectManager.renameVolume(projectPath, oldVolumeName, newVolumeName)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_DELETE_VOLUME,
+    async (
+      _event,
+      {
+        projectPath,
+        volumeName,
+        keepChapters
+      }: { projectPath: string; volumeName: string; keepChapters?: boolean }
+    ) => {
+      return globalProjectManager.deleteVolume(projectPath, volumeName, keepChapters)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_REORDER_CHAPTERS,
+    async (
+      _event,
+      {
+        projectPath,
+        volume,
+        orderedFilenames
+      }: { projectPath: string; volume?: string; orderedFilenames: string[] }
+    ) => {
+      return globalProjectManager.reorderProjectChapters(projectPath, volume, orderedFilenames)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_MOVE_CHAPTER,
+    async (
+      _event,
+      params: {
+        projectPath: string
+        chapterId?: string
+        filename: string
+        sourceVolume?: string
+        targetVolume?: string
+        targetIndex: number
+      }
+    ) => {
+      return globalProjectManager.moveProjectChapter(params.projectPath, params)
     }
   )
 
