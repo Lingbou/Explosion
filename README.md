@@ -19,14 +19,14 @@
 **Explosion** 专为中长篇严肃小说创作设计，秉承以下核心理念：
 
 1. **以文件为唯一事实源（File as Source of Truth）**  
-   手稿直接读写本地纯文本文件（`.txt`），不经过中间专有数据库劫持。Agent 采用以 Task Turn 为周期的轻量执行模型，按需调阅设定与资料，任务执行完毕即刻释放长上下文，从根本上杜绝上下文腐烂（Context Rot）。
+   手稿直接读写本地纯文本文件（`.txt`），不经过中间专有数据库劫持。Agent 采用以 Task Turn 为周期的轻量执行模型，按需调阅设定与资料，任务执行完毕即刻释放长上下文，避免因长会话无序累积导致的上下文腐烂（Context Rot）。
 2. **零 Markdown 污染的纯文本排版（Pure Text First）**  
-   正文手稿容器严格杜绝 `#`、`**`、`-` 等符号污染，原生支持段首全角双空格缩进、中文标点规范化（智能转换引号与破折号）、实时字数与预计阅读时间统计，并支持一键复制出版级纯文本。
+   正文手稿容器保持纯文本，不引入 `#`、`**`、`-` 等 Markdown 格式标记，原生支持段首全角双空格缩进、中文标点规范化（智能转换引号与破折号）、实时字数与预计阅读时间统计，并支持一键复制出版级纯文本。
 3. **独立素材资料库与小说项目物理隔离（Library & Project Decoupling）**  
    - **全局藏书资料库（Library）**：统一存放在 `~/.explosion/library/`，支持整本原始原著 TXT 导入与物理智能拆解，内置 768 维语义向量与 SQLite FTS5 文学级 Hybrid RAG 检索。
    - **小说项目工作区（Project）**：仅包含章节手稿（`manuscript/`）、本作专属内生设定（`story/`，涵盖大纲规划、人物档案、暗线推演与事实账本）及本地时光机快照（`.explosion/snapshots/`）。
-4. **多 Agent 协同审校与静默去 AI 味（Sub-Agent Review & Silent Guardrails）**  
-   由主 Agent 驱动的 Sub-agent 审校体系（文风拟合度 Style Critic、设定一致性 Consistency Inspector、去 AI 味 De-AI Guard），毫秒级拦截辩证排比与空洞微表情套话，落实白描、具象动作化（Show don't tell）与自然留白。
+4. **Sub-agent 生命周期体系与静默去 AI 味门禁（Sub-Agent & Silent Guardrails）**  
+   主 Agent 可动态派生（spawn）独立子任务工蜂，在隔离沙箱上下文中并发执行资料考据或长篇叙事状态追踪（State Commit）并落盘更新设定；内置 Silent Guardrails 规则门禁，毫秒级扫描拦截辩证排比与空洞微表情套话，落实白描、具象动作化（Show don't tell）与自然留白。
 5. **多协议大模型统一适配（Multi-Protocol LLM Adapter）**  
    原生支持 OpenAI Chat Completions、OpenAI Responses 与 Anthropic Messages 三大规范，支持动态拉取上游模型列表与单一主力模型驱动。
 
@@ -34,21 +34,26 @@
 
 ## 核心功能清单
 
-| 模块 | 功能特性 | 说明 |
-| :--- | :--- | :--- |
-| **纯文本编辑器** | 零 Markdown 污染容器 | 编辑器核心为纯文本，绝不渲染 Markdown 标记，保障纯粹的执笔手感。 |
-| | 中文出版排版规范 | 一键规范排版：段首自动缩进两个全角空格、段落空行归一、标点符号规范化（`“ ”`、`——`）。 |
-| | 一键出版级纯文本复制 | 过滤多余换行与脏字符，一键复制符合连载平台与出版格式的纯文本到系统剪贴板。 |
-| | 划词悬浮菜单与局部改写 | 在手稿中选中文本即刻弹出悬浮菜单，定向指派 Agent 进行局部扩写、润色、查证与精准重构。 |
-| | 本地时光机快照回滚 | 章节保存自动沉淀增量快照，提供时光机抽屉进行历史版本查看与无损回滚，杜绝误操作与丢稿。 |
-| **独立资料库** | 原著导入与物理切分 | `organize_library.py` 负责长篇原著的卷目拆分与结构化归整，严禁机械文学打标。 |
-| | 768 维 + FTS5 Hybrid RAG | 结合本地 768 维向量与 Node 内置 `node:sqlite` FTS5 倒排索引，采用 RRF 算法毫秒级检索原著段落与意境，支持无向量环境优雅降级。 |
-| | `@` 联想引用系统 | 在右侧 Agent 对话框输入 `@`，可实时联想并挂载资料库书目分卷，作为精准上下文注入。 |
-| **Agent 执行引擎** | Task Turn 隔离上下文 | 按需注入参考材料，任务完成后释放会话缓存，保持上下文常新。 |
-| | 多协议 LLM 适配器 | 原生对接 `/v1/chat/completions`、`/v1/responses` 与 `/v1/messages`，覆盖主流闭源与开源模型。 |
-| | 嵌入式 AnySearch | 主进程直连 AnySearch 客户端，支持实时联网检索与网页正文提取，无需配置额外复杂 API Key。 |
-| | Sub-agent 审校矩阵 | 主笔生成后触发文风拟合、设定防吃书与 De-AI 检查，右侧展示建议与 Diff 采纳卡片。 |
-| | 静默去 AI 味门禁 | 内置毫秒级规则引擎，严格拦截“不是……而是”、“空气仿佛凝固”、“嘴角勾起弧度”等典型 AI 辩证套话与悬浮表情。 |
+| 模块 | 功能特性 | 说明 | 代码证据 |
+| :--- | :--- | :--- | :--- |
+| **纯文本编辑器** | 零 Markdown 污染容器 | 编辑器核心为原生纯文本输入区，不引入 Markdown 渲染标记，保障纯粹的执笔手感。 | `src/renderer/src/components/layout/EditorCenter.tsx` |
+| | 中文出版排版规范 | 一键规范排版：段首自动缩进两个全角空格、段落空行归一、标点符号规范化（`“ ”`、`——`）。 | `src/renderer/src/lib/typography.ts` |
+| | 一键出版级纯文本复制 | 过滤多余换行与脏字符，一键复制符合排版标准的纯文本到系统剪贴板。 | `src/renderer/src/components/layout/EditorCenter.tsx` |
+| | 划词悬浮菜单与局部改写 | 在手稿中选中文本即刻弹出悬浮菜单，定向指派 Agent 进行局部扩写、润色、查证与精准重构。 | `src/renderer/src/lib/selection.ts`, `EditorCenter.tsx`, `RightPanel.tsx` |
+| | 卷-章树状手稿组织 | 支持分卷管理、重命名与章节层级拖拽排序，支持多卷大篇幅章节管理。 | `src/main/project/manager.ts`, `LeftSidebar.tsx` |
+| | 专注码字手感 | 支持打字机定焦滚动、全局夜间模式、字号与行距个性化调节。 | `src/renderer/src/lib/typewriter.ts`, `EditorCenter.tsx` |
+| | 纯文本手稿导出 | 支持将全书合并导出或按卷导出为无污染纯文本 TXT。 | `src/main/project/manager.ts`, `LeftSidebar.tsx` |
+| | 本地时光机快照回滚 | 章节保存自动沉淀增量快照，提供时光机抽屉进行历史版本对比与无损回滚，降低误操作丢稿风险。 | `src/main/project/snapshot-manager.ts`, `SnapshotDrawer.tsx` |
+| **独立资料库** | 原著导入与物理切分 | `organize_library.py` 负责长篇原著的卷目拆分与结构化归整，严禁机械文学打标。 | `src/main/library/organize_library.py`, `manager.ts` |
+| | 768 维 + FTS5 Hybrid RAG | 结合本地 768 维向量与 Node 内置 `node:sqlite` FTS5 倒排索引，采用 RRF 算法毫秒级检索原著段落与意境，支持无向量环境平滑降级。 | `src/main/agent/tools/search-library.ts` |
+| | `@` 联想引用系统 | 在右侧 Agent 对话框输入 `@`，可实时联想并挂载资料库书目分卷，作为精准上下文注入。 | `src/renderer/src/components/layout/RightPanel.tsx`, `prompts.ts` |
+| **Agent 执行引擎** | Task Turn 隔离上下文 | 按需注入参考材料，任务完成后释放会话缓存，保持上下文常新。 | `src/main/agent/runner.ts` |
+| | 多协议 LLM 适配器 | 原生对接 `/v1/chat/completions`、`/v1/responses` 与 `/v1/messages`，覆盖主流闭源与开源模型。 | `src/main/llm/adapter.ts`, `protocols/*` |
+| | 实时流式打断与重试 | 支持毫秒级打断生成（AbortController）与一键热重试。 | `src/main/agent/runner.ts`, `agentStore.ts` |
+| | 嵌入式 AnySearch | 主进程直连 AnySearch 客户端，支持实时联网检索与网页正文提取，无需配置额外 API Key。 | `src/main/agent/tools/web-tools.ts` |
+| | Sub-agent 生命周期体系 | 主 Agent 可按需派生（spawn）独立子任务工蜂，在隔离沙箱中执行资料考据或长篇叙事状态追踪（State Commit）并落盘更新设定账本。 | `src/main/agent/tools/subagent-tools.ts`, `subagent-manager.ts` |
+| | 静默去 AI 味门禁 | 内置毫秒级规则引擎，严格拦截“不是……而是”、“空气仿佛凝固”、“嘴角勾起弧度”等典型 AI 辩证套话与悬浮表情。 | `src/main/agent/guardrails/silent-guardrails.ts` |
+| | 长篇小说执笔 SOP | 固化雪花写作法、Scene Beats 与 MRU (Motivation-Reaction Unit) 场景执笔协议。 | `src/main/agent/prompts.ts` |
 
 ---
 
@@ -119,7 +124,7 @@ Explosion 采用**单一主力模型全局驱动**架构，主笔与并发 Sub-a
 | **OpenAI** | OpenAI Chat Completions / Responses | `https://api.openai.com/v1` | 支持标准 Completions 与新版 Responses 协议 |
 | **Anthropic** | Anthropic Messages | `https://api.anthropic.com/v1` | 支持 Claude 系列的 `/v1/messages` 规范 |
 | **Ollama** | OpenAI Chat Completions | `http://localhost:11434/v1` | 本地私有化大模型运行，支持自动拉取已下载模型列表 |
-| **OpenRouter** | OpenAI Chat Completions | `https://openrouter.ai/api/v1` | 聚合各类顶级推理模型 |
+| **OpenRouter** | OpenAI Chat Completions | `https://openrouter.ai/api/v1` | 聚合各类主流推理模型 |
 | **自定义** | 任选三大协议之一 | 自定义 URL 与端点路径 | 支持任意符合以上协议规范的反向代理或第三方服务 |
 
 > **提示**：配置 API Key 与端点后，点击模型输入框旁的「获取列表」按钮可直接拉取上游端点返回的模型清单；同时支持在 Combobox 中手动输入任意模型名称。
@@ -131,7 +136,7 @@ Explosion 采用**单一主力模型全局驱动**架构，主笔与并发 Sub-a
 ```text
 Explosion/
 ├── resources/                   # 桌面应用图标与静态素材 (icon.png, icon.svg)
-├── docs/                        # 说明文档与界面截图
+├── docs/                        # 说明文档与界面截图 (screenshot.png)
 ├── src/
 │   ├── main/                    # Electron 主进程
 │   │   ├── agent/               # Agent 执行引擎 (Runner, Sub-agent Manager, Prompts, Tools)
@@ -141,12 +146,12 @@ Explosion/
 │   │   ├── ipc/                 # 主进程 IPC 通信处理器注册
 │   │   ├── library/             # 独立资料库管理与 organize_library.py 脚本
 │   │   ├── llm/                 # 多协议 LLM 适配器 (Chat Completions / Responses / Messages)
-│   │   └── project/             # 小说工程管理与时光机快照系统
+│   │   └── project/             # 小说工程管理、时光机快照与文件落盘
 │   ├── preload/                 # Electron 预加载脚本 (类型安全 IPC Bridge)
 │   ├── renderer/                # React 19 渲染进程 (工作台界面)
 │   │   ├── src/
 │   │   │   ├── components/      # UI 组件 (EditorCenter, LeftSidebar, RightPanel, Modals)
-│   │   │   ├── lib/             # 中文排版引擎 (typography) 与划词处理
+│   │   │   ├── lib/             # 中文排版引擎 (typography)、打字机滚动与划词处理
 │   │   │   └── store/           # Zustand 状态管理 (workspace, agent, config, library)
 │   │   └── index.html           # 渲染主页面
 │   └── shared/                  # 主进程与渲染进程共享类型与工具函数
@@ -174,8 +179,10 @@ Explosion/
 ```text
 my-novel-project/
 ├── manuscript/                  # 【小说正文手稿】（直接读写磁盘纯文本，无中间数据库）
-│   ├── 001_引子.txt
-│   └── 002_长街夜行.txt
+│   ├── vol_01_起/               # 分卷目录（可选）
+│   │   ├── 001_引子.txt
+│   │   └── 002_长街夜行.txt
+│   └── 001_章节名.txt
 ├── story/                       # 【本作专属内生设定】
 │   ├── characters/              # 人物档案（身份、动机、性格、复杂人际关系）
 │   ├── world/                   # 虚构构想与剧情推演（核心推演、暗线分析）
@@ -192,7 +199,7 @@ my-novel-project/
 
 本项目遵循严格的敏捷工程约束与架构原则：
 
-- **破坏性重构优先（Zero Backward Compatibility Burden）**：敏捷初期杜绝为历史兼容保留过渡层，一旦发现更优设计直接重构。
+- **破坏性重构优先（Zero Backward Compatibility Burden）**：敏捷初期不为历史兼容保留陈旧过渡层，一旦发现更优设计直接重构。
 - **全流程 Worktree 隔离开发**：禁止直接在主分支提交代码；所有任务严格遵循 `[Issue] ➔ [Worktree in .temp/] ➔ [PR] ➔ [Merge] ➔ [Clean]` 标准流程。
 - **规范指引**：参与开发前，请务必详阅 **[AGENTS.md](./AGENTS.md)**。
 
