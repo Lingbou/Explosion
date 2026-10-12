@@ -59,6 +59,7 @@ export interface ProjectData {
   path: string
   title: string
   chapters: ProjectChapterFile[]
+  volumes?: string[]
   activeChapterId?: string
   storyBible?: StoryBibleData
 }
@@ -218,6 +219,11 @@ export const IPC_CHANNELS = {
   PROJECT_SAVE_CHAPTER: 'project:save-chapter',
   PROJECT_RENAME_CHAPTER: 'project:rename-chapter',
   PROJECT_DELETE_CHAPTER: 'project:delete-chapter',
+  PROJECT_CREATE_VOLUME: 'project:create-volume',
+  PROJECT_RENAME_VOLUME: 'project:rename-volume',
+  PROJECT_DELETE_VOLUME: 'project:delete-volume',
+  PROJECT_REORDER_CHAPTERS: 'project:reorder-chapters',
+  PROJECT_MOVE_CHAPTER: 'project:move-chapter',
   PROJECT_SAVE_META: 'project:save-meta',
   PROJECT_EXPORT_MANUSCRIPT: 'project:export-manuscript',
   PROJECT_CLOSE: 'project:close',
@@ -302,11 +308,40 @@ export interface ElectronApi {
     chapterId: string
     oldFilename: string
     newTitle: string
+    volume?: string
   }) => Promise<{ success: boolean; newFilename: string }>
   deleteProjectChapter: (params: {
     projectPath: string
     filename: string
+    volume?: string
   }) => Promise<boolean>
+  createProjectVolume: (params: {
+    projectPath: string
+    volumeName: string
+  }) => Promise<{ success: boolean; volumeName: string }>
+  renameProjectVolume: (params: {
+    projectPath: string
+    oldVolumeName: string
+    newVolumeName: string
+  }) => Promise<{ success: boolean; newVolumeName: string }>
+  deleteProjectVolume: (params: {
+    projectPath: string
+    volumeName: string
+    keepChapters?: boolean
+  }) => Promise<{ success: boolean }>
+  reorderProjectChapters: (params: {
+    projectPath: string
+    volume?: string
+    orderedFilenames: string[]
+  }) => Promise<{ success: boolean; chapters: ProjectChapterFile[] }>
+  moveProjectChapter: (params: {
+    projectPath: string
+    chapterId?: string
+    filename: string
+    sourceVolume?: string
+    targetVolume?: string
+    targetIndex: number
+  }) => Promise<{ success: boolean; chapters: ProjectChapterFile[] }>
   saveProjectMeta: (params: { projectPath: string; title: string }) => Promise<boolean>
   closeProject: () => Promise<boolean>
   exportManuscript: (params: {

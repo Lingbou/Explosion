@@ -148,13 +148,52 @@ const api: ElectronApi = {
     chapterId: string
     oldFilename: string
     newTitle: string
+    volume?: string
   }): Promise<{ success: boolean; newFilename: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.PROJECT_RENAME_CHAPTER, params),
 
   deleteProjectChapter: (params: {
     projectPath: string
     filename: string
+    volume?: string
   }): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_DELETE_CHAPTER, params),
+
+  createProjectVolume: (params: {
+    projectPath: string
+    volumeName: string
+  }): Promise<{ success: boolean; volumeName: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_CREATE_VOLUME, params),
+
+  renameProjectVolume: (params: {
+    projectPath: string
+    oldVolumeName: string
+    newVolumeName: string
+  }): Promise<{ success: boolean; newVolumeName: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_RENAME_VOLUME, params),
+
+  deleteProjectVolume: (params: {
+    projectPath: string
+    volumeName: string
+    keepChapters?: boolean
+  }): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_DELETE_VOLUME, params),
+
+  reorderProjectChapters: (params: {
+    projectPath: string
+    volume?: string
+    orderedFilenames: string[]
+  }): Promise<{ success: boolean; chapters: ProjectChapterFile[] }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_REORDER_CHAPTERS, params),
+
+  moveProjectChapter: (params: {
+    projectPath: string
+    chapterId?: string
+    filename: string
+    sourceVolume?: string
+    targetVolume?: string
+    targetIndex: number
+  }): Promise<{ success: boolean; chapters: ProjectChapterFile[] }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_MOVE_CHAPTER, params),
 
   saveProjectMeta: (params: { projectPath: string; title: string }): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.PROJECT_SAVE_META, params),
