@@ -122,7 +122,7 @@ export const LibraryPreviewModal: React.FC = () => {
         className="w-full max-w-5xl h-[85vh] bg-[#fbfbfa] border border-stone-200 rounded-xl shadow-2xl flex flex-col overflow-hidden font-sans"
       >
         {/* Modal Top Header */}
-        <div className="h-12 px-5 border-b border-stone-200 bg-white flex items-center justify-between select-none shrink-0">
+        <div className="h-12 px-5 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1f1e1c] flex items-center justify-between select-none shrink-0">
           <div className="flex items-center gap-2.5">
             <BookOpen className="w-4 h-4 text-stone-700 shrink-0" />
             <span className="font-semibold text-xs text-stone-900">
@@ -170,7 +170,7 @@ export const LibraryPreviewModal: React.FC = () => {
           {/* Left Column: Hierarchical Book List */}
           <div className="w-80 border-r border-stone-200 bg-[#f7f7f5] flex flex-col justify-between shrink-0 overflow-hidden">
             {/* Search Filter */}
-            <div className="p-2.5 border-b border-stone-200 bg-white">
+            <div className="p-2.5 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1f1e1c]">
               <div className="relative flex items-center">
                 <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 pointer-events-none" />
                 <input
@@ -178,7 +178,7 @@ export const LibraryPreviewModal: React.FC = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="搜索资料或分卷..."
-                  className="w-full pl-8 pr-2 py-1 text-xs bg-stone-50 border border-stone-200 rounded-md focus:outline-none focus:border-stone-400 focus:bg-white transition-all text-stone-800 placeholder-stone-400"
+                  className="w-full pl-8 pr-2 py-1 text-xs bg-stone-50 dark:bg-[#141413] border border-stone-200 dark:border-stone-700 rounded-md focus:outline-none focus:border-stone-400 dark:focus:border-stone-500 focus:bg-white dark:focus:bg-[#181716] transition-all text-stone-800 dark:text-stone-200 placeholder-stone-400 dark:placeholder-stone-500"
                 />
               </div>
             </div>
@@ -228,8 +228,8 @@ export const LibraryPreviewModal: React.FC = () => {
                                   onClick={() => selectBook(book.relativePath || book.filename)}
                                   className={`group flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
                                     isSelected
-                                      ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/80'
-                                      : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
+                                      ? 'bg-white dark:bg-[#252321] text-stone-900 dark:text-stone-100 font-medium shadow-2xs border border-stone-200/80 dark:border-stone-700'
+                                      : 'text-stone-600 dark:text-stone-400 hover:bg-stone-200/50 dark:hover:bg-stone-800/60 hover:text-stone-900 dark:hover:text-stone-100'
                                   }`}
                                 >
                                   <div className="flex items-center gap-1.5 truncate flex-1 mr-1">
@@ -279,8 +279,8 @@ export const LibraryPreviewModal: React.FC = () => {
                         onClick={() => selectBook(book.filename)}
                         className={`group flex items-center justify-between px-2.5 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
                           isSelected
-                            ? 'bg-white text-stone-900 font-medium shadow-2xs border border-stone-200/80'
-                            : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
+                            ? 'bg-white dark:bg-[#252321] text-stone-900 dark:text-stone-100 font-medium shadow-2xs border border-stone-200/80 dark:border-stone-700'
+                            : 'text-stone-600 dark:text-stone-400 hover:bg-stone-200/50 dark:hover:bg-stone-800/60 hover:text-stone-900 dark:hover:text-stone-100'
                         }`}
                       >
                         <div className="flex items-center gap-2 truncate flex-1 mr-1">
@@ -332,7 +332,7 @@ export const LibraryPreviewModal: React.FC = () => {
           </div>
 
           {/* Right Column: Clean Content Reading Pane */}
-          <div className="flex-1 flex flex-col bg-white overflow-hidden">
+          <div className="flex-1 flex flex-col bg-white dark:bg-[#181716] overflow-hidden">
             {previewBook ? (
               <>
                 {/* Viewer Top Subheader */}
@@ -365,7 +365,7 @@ export const LibraryPreviewModal: React.FC = () => {
                 </div>
 
                 {/* Text Body */}
-                <div className="flex-1 overflow-y-auto px-10 py-8 select-text scrollbar-thin bg-white">
+                <div className="flex-1 overflow-y-auto px-10 py-8 select-text scrollbar-thin bg-white dark:bg-[#141413]">
                   <div className="max-w-3xl mx-auto">
                     {isTruncated && (
                       <div className="mb-4 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] flex items-center gap-2">
@@ -395,7 +395,7 @@ export const LibraryPreviewModal: React.FC = () => {
         <div className="h-9 px-5 border-t border-stone-200 bg-stone-50 flex items-center justify-end text-[11px] select-none shrink-0">
           <button
             onClick={closeLibraryModal}
-            className="px-3.5 py-1 text-xs font-medium text-stone-700 hover:text-stone-900 bg-white border border-stone-200 hover:bg-stone-100 rounded-md transition-colors shadow-2xs"
+            className="px-3.5 py-1 text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 bg-white dark:bg-[#252321] border border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-md transition-colors shadow-2xs cursor-pointer"
           >
             完成
           </button>

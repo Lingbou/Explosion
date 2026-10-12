@@ -120,7 +120,7 @@ export const SnapshotDrawer: React.FC<SnapshotDrawerProps> = ({
         className="w-full max-w-5xl h-[85vh] bg-[#fbfbfa] border border-stone-200 rounded-xl shadow-2xl flex flex-col overflow-hidden"
       >
         {/* Header */}
-        <div className="h-12 px-5 border-b border-stone-200 bg-white flex items-center justify-between select-none shrink-0">
+        <div className="h-12 px-5 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1f1e1c] flex items-center justify-between select-none shrink-0">
           <div className="flex items-center gap-2.5">
             <History className="w-4 h-4 text-stone-700 shrink-0" />
             <span className="font-semibold text-xs text-stone-900">
@@ -150,7 +150,7 @@ export const SnapshotDrawer: React.FC<SnapshotDrawerProps> = ({
         <div className="flex-1 flex overflow-hidden">
           {/* Left: Snapshot Timeline */}
           <div className="w-80 border-r border-stone-200 bg-[#f7f7f5] flex flex-col justify-between shrink-0 overflow-hidden">
-            <div className="p-2.5 border-b border-stone-200 bg-white text-[11px] font-semibold text-stone-500 uppercase tracking-wider flex items-center justify-between">
+            <div className="p-2.5 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1f1e1c] text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider flex items-center justify-between">
               <span>快照版本时间线</span>
               {isLoading && <span className="text-[10px] text-stone-400">加载中...</span>}
             </div>
@@ -181,8 +181,8 @@ export const SnapshotDrawer: React.FC<SnapshotDrawerProps> = ({
                       onClick={() => handleSelectSnapshot(snap.id)}
                       className={`p-2.5 rounded-lg text-xs cursor-pointer transition-colors border ${
                         isSelected
-                          ? 'bg-white text-stone-900 shadow-2xs border-stone-300'
-                          : 'bg-transparent border-transparent text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
+                          ? 'bg-white dark:bg-[#252321] text-stone-900 dark:text-stone-100 shadow-2xs border-stone-300 dark:border-stone-700'
+                          : 'bg-transparent border-transparent text-stone-600 dark:text-stone-400 hover:bg-stone-200/50 dark:hover:bg-stone-800/60 hover:text-stone-900 dark:hover:text-stone-100'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
@@ -222,7 +222,7 @@ export const SnapshotDrawer: React.FC<SnapshotDrawerProps> = ({
           </div>
 
           {/* Right: Snapshot Content Preview & Restore */}
-          <div className="flex-1 flex flex-col bg-white overflow-hidden">
+          <div className="flex-1 flex flex-col bg-white dark:bg-[#181716] overflow-hidden">
             {selectedSnapshot ? (
               <>
                 {/* Preview Toolbar */}
@@ -248,7 +248,7 @@ export const SnapshotDrawer: React.FC<SnapshotDrawerProps> = ({
                 </div>
 
                 {/* Text Body */}
-                <div className="flex-1 overflow-y-auto px-10 py-8 select-text scrollbar-thin bg-white">
+                <div className="flex-1 overflow-y-auto px-10 py-8 select-text scrollbar-thin bg-white dark:bg-[#141413]">
                   <div className="max-w-3xl mx-auto">
                     <pre className="whitespace-pre-wrap font-serif text-sm leading-[2.1] text-stone-900 tracking-wide font-normal">
                       {previewContent}

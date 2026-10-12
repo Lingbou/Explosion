@@ -190,7 +190,7 @@ const TraceCard: React.FC<{ trace: AgentTraceStep }> = ({ trace }) => {
   const Icon = meta.icon
 
   return (
-    <div className="border border-stone-200 rounded-lg overflow-hidden bg-white shadow-2xs text-[11px] font-sans">
+    <div className="border border-stone-200 dark:border-stone-800 rounded-lg overflow-hidden bg-white dark:bg-[#1f1e1c] shadow-2xs text-[11px] font-sans">
       <div
         onClick={() => setIsOpen(!isOpen)}
         className="px-2.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-stone-50 transition-colors select-none"
@@ -238,14 +238,14 @@ const TraceCard: React.FC<{ trace: AgentTraceStep }> = ({ trace }) => {
         <div className="border-t border-stone-100 bg-stone-50/70 p-2 space-y-1.5 text-[10px] font-mono">
           <div>
             <span className="text-stone-400 block mb-0.5">参数输入 (Args):</span>
-            <pre className="p-1.5 rounded bg-white border border-stone-200 overflow-x-auto whitespace-pre-wrap text-stone-800 max-h-32">
+            <pre className="p-1.5 rounded bg-white dark:bg-[#141413] border border-stone-200 dark:border-stone-800 overflow-x-auto whitespace-pre-wrap text-stone-800 dark:text-stone-200 max-h-32">
               {JSON.stringify(trace.args, null, 2)}
             </pre>
           </div>
 
           <div>
             <span className="text-stone-400 block mb-0.5">执行反馈 (Output):</span>
-            <pre className="p-1.5 rounded bg-white border border-stone-200 overflow-x-auto whitespace-pre-wrap text-stone-800 max-h-48">
+            <pre className="p-1.5 rounded bg-white dark:bg-[#141413] border border-stone-200 dark:border-stone-800 overflow-x-auto whitespace-pre-wrap text-stone-800 dark:text-stone-200 max-h-48">
               {trace.result || trace.error || '(无返回内容)'}
             </pre>
           </div>
@@ -262,7 +262,7 @@ export const SubAgentTaskCard: React.FC<{ subagent: SubAgentTaskInfo }> = ({ sub
   const isError = subagent.status === 'failed' || subagent.status === 'terminated'
 
   return (
-    <div className="border border-stone-200 rounded-lg overflow-hidden bg-white shadow-2xs text-[11px] font-sans">
+    <div className="border border-stone-200 dark:border-stone-800 rounded-lg overflow-hidden bg-white dark:bg-[#1f1e1c] shadow-2xs text-[11px] font-sans">
       <div
         onClick={() => setIsOpen(!isOpen)}
         className="px-2.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-stone-50 transition-colors select-none"
@@ -316,7 +316,7 @@ export const SubAgentTaskCard: React.FC<{ subagent: SubAgentTaskInfo }> = ({ sub
         <div className="border-t border-stone-100 bg-stone-50/70 p-2 space-y-2 text-[10px]">
           <div>
             <span className="text-stone-400 block mb-0.5">任务指令:</span>
-            <div className="p-1.5 rounded bg-white border border-stone-200 text-stone-700 whitespace-pre-wrap leading-relaxed font-sans max-h-28 overflow-y-auto">
+            <div className="p-1.5 rounded bg-white dark:bg-[#141413] border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 whitespace-pre-wrap leading-relaxed font-sans max-h-28 overflow-y-auto">
               {subagent.instruction}
             </div>
           </div>
@@ -330,7 +330,7 @@ export const SubAgentTaskCard: React.FC<{ subagent: SubAgentTaskInfo }> = ({ sub
                 {subagent.steps.map((st, i) => (
                   <div
                     key={st.id || i}
-                    className="p-1.5 rounded bg-white border border-stone-200 flex items-start justify-between gap-2 font-mono text-[9px]"
+                    className="p-1.5 rounded bg-white dark:bg-[#141413] border border-stone-200 dark:border-stone-800 flex items-start justify-between gap-2 font-mono text-[9px]"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1 font-semibold text-stone-800">
@@ -381,7 +381,7 @@ export const SubAgentTaskCard: React.FC<{ subagent: SubAgentTaskInfo }> = ({ sub
           {subagent.output && (
             <div>
               <span className="text-stone-400 block mb-0.5">子任务汇报产出:</span>
-              <pre className="p-1.5 rounded bg-white border border-stone-200 overflow-x-auto whitespace-pre-wrap text-stone-800 font-serif leading-relaxed max-h-32">
+              <pre className="p-1.5 rounded bg-white dark:bg-[#141413] border border-stone-200 dark:border-stone-800 overflow-x-auto whitespace-pre-wrap text-stone-800 dark:text-stone-200 font-serif leading-relaxed max-h-32">
                 {stripMarkdownMarks(subagent.output)}
               </pre>
             </div>
@@ -578,10 +578,10 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
   return (
     <aside
       style={{ width: `${width}px` }}
-      className="border-l border-stone-200 bg-white flex flex-col justify-between select-none shrink-0 overflow-hidden relative"
+      className="border-l border-stone-200 dark:border-stone-800 bg-white dark:bg-[#181716] flex flex-col justify-between select-none shrink-0 overflow-hidden relative"
     >
       {/* Top Header: Column-Integrated Session Management, Model Pill & Global Settings */}
-      <div className="h-11 px-3 border-b border-stone-200 flex items-center justify-between bg-white shrink-0 relative z-30">
+      <div className="h-11 px-3 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between bg-white dark:bg-[#1f1e1c] shrink-0 relative z-30">
         {/* Left: Current Session Title & History Dropdown Trigger */}
         <div ref={dropdownRef} className="relative">
           <button
@@ -597,7 +597,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
 
           {/* Sessions Dropdown Menu */}
           {isSessionDropdownOpen && (
-            <div className="absolute top-8 left-0 w-64 bg-white border border-stone-200 rounded-lg shadow-xl py-1.5 z-50 text-xs font-sans animate-in fade-in duration-100">
+            <div className="absolute top-8 left-0 w-64 bg-white dark:bg-[#22211f] border border-stone-200 dark:border-stone-700 rounded-lg shadow-xl py-1.5 z-50 text-xs font-sans animate-in fade-in duration-100">
               <div className="px-3 py-1.5 text-[10px] text-stone-400 font-semibold uppercase tracking-wider border-b border-stone-100">
                 <span>历史会话记录 ({sessions.length})</span>
               </div>
@@ -739,7 +739,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
                       )}
                     </button>
                     {showThinkingMap[msg.id] && (
-                      <div className="p-2.5 border-t border-stone-200 bg-white font-mono text-[10px] text-stone-600 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                      <div className="p-2.5 border-t border-stone-200 dark:border-stone-800 bg-white dark:bg-[#171615] font-mono text-[10px] text-stone-600 dark:text-stone-300 whitespace-pre-wrap max-h-48 overflow-y-auto">
                         {msg.thinking}
                       </div>
                     )}
@@ -765,7 +765,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
                 )}
 
                 {/* Final Content: Clean Pure Text with Zero Markdown Pollution */}
-                <div className="p-3 rounded-lg border border-stone-200 bg-white text-stone-900 font-serif leading-relaxed select-text shadow-2xs whitespace-pre-wrap">
+                <div className="p-3 rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1f1e1c] text-stone-900 dark:text-stone-100 font-serif leading-relaxed select-text shadow-2xs whitespace-pre-wrap">
                   {stripMarkdownMarks(msg.content)}
                 </div>
               </div>
@@ -821,7 +821,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
       </div>
 
       {/* Input Area (Clean & Pure with @Mention Popover & Selection Capsule) */}
-      <div className="p-3 border-t border-stone-200 bg-white shrink-0 relative">
+      <div className="p-3 border-t border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1a1918] shrink-0 relative">
         {/* Selection Reference Capsule */}
         {selectedText && (
           <div className="mb-2 flex items-center justify-between gap-2 px-2.5 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 shadow-2xs animate-in fade-in slide-in-from-bottom-1 duration-150">
@@ -848,7 +848,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
 
         {/* @ Mention Popover Menu */}
         {mentionQuery !== null && mentionCandidates.length > 0 && (
-          <div className="absolute bottom-full mb-1.5 left-3 right-3 max-h-48 bg-white border border-stone-200 rounded-lg shadow-xl overflow-hidden flex flex-col z-50 text-xs font-sans animate-in fade-in duration-100">
+          <div className="absolute bottom-full mb-1.5 left-3 right-3 max-h-48 bg-white dark:bg-[#22211f] border border-stone-200 dark:border-stone-700 rounded-lg shadow-xl overflow-hidden flex flex-col z-50 text-xs font-sans animate-in fade-in duration-100">
             <div className="px-3 py-1.5 border-b border-stone-100 text-[10px] text-stone-400 font-semibold uppercase tracking-wider flex items-center justify-between">
               <span>引用资料库 (@MENTION)</span>
               <span className="font-mono text-[9px]">↑↓ 选择 · 回车插入</span>
@@ -873,7 +873,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
           </div>
         )}
 
-        <div className="relative flex items-end bg-stone-50 border border-stone-200 rounded-lg p-1.5 focus-within:border-stone-400 focus-within:bg-white transition-all">
+        <div className="relative flex items-end bg-stone-50 border border-stone-200 rounded-lg p-1.5 focus-within:border-stone-400 dark:focus-within:border-stone-600 focus-within:bg-white dark:focus-within:bg-[#161514] transition-all">
           <textarea
             ref={textareaRef}
             value={inputPrompt}
@@ -881,7 +881,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
             onKeyDown={handleKeyDown}
             placeholder={selectedText ? '输入修改指令，将精准改写上述选中文段...' : '输入指令，输入 @ 可引用参考资料 (Enter 发送)...'}
             rows={2}
-            className="w-full bg-transparent resize-none border-none focus:outline-none text-xs text-stone-900 placeholder-stone-400 px-2 py-1 leading-relaxed max-h-24 scrollbar-thin"
+            className="w-full bg-transparent resize-none border-none focus:outline-none text-xs text-stone-900 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-500 px-2 py-1 leading-relaxed max-h-24 scrollbar-thin"
           />
 
           <div className="flex items-center gap-1 ml-1 pb-1">
