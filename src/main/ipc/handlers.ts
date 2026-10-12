@@ -1,5 +1,5 @@
 import { ipcMain, clipboard, BrowserWindow } from 'electron'
-import { AgentTaskOptions, IPC_CHANNELS, ProjectChapterFile } from '../../shared/types/ipc'
+import { AgentSession, AgentTaskOptions, IPC_CHANNELS, ProjectChapterFile } from '../../shared/types/ipc'
 import { AppConfig } from '../../shared/types/config'
 import {
   FetchModelsParams,
@@ -12,6 +12,7 @@ import { globalProjectManager } from '../project/manager'
 import { globalLibraryManager } from '../library/manager'
 import { globalAgentRunner } from '../agent/runner'
 import { globalSnapshotManager } from '../project/snapshot-manager'
+import { globalSessionManager } from '../agent/session-manager'
 
 export function registerIpcHandlers(): void {
   // Config Handlers
@@ -119,6 +120,43 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.AGENT_ABORT_TASK, async (_event, taskId: string) => {
     return globalAgentRunner.abortTask(taskId)
   })
+
+  // Agent Sessions File Persistence
+  ipcMain.handle(IPC_CHANNELS.AGENT_SESSION_LIST, async (_event, { projectPath }: { projectPath: string }) => {
+    return globalSessionManager.listSessions(projectPath)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.AGENT_SESSION_LOAD,
+    async (_event, { projectPath, sessionId }: { projectPath: string; sessionId: string }) => {
+      return globalSessionManager.loadSession(projectPath, sessionId)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.AGENT_SESSION_SAVE,
+    async (_event, { projectPath, session }: { projectPath: string; session: AgentSession }) => {
+      return globalSessionManager.saveSession(projectPath, session)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.AGENT_SESSION_RENAME,
+    async (
+      _event,
+      { projectPath, sessionId, title }: { projectPath: string; sessionId: string; title: string }
+    ) => {
+      return globalSessionManager.renameSession(projectPath, sessionId, title)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.AGENT_SESSION_DELETE,
+    async (_event, { projectPath, sessionId }: { projectPath: string; sessionId: string }) => {
+      return globalSessionManager.deleteSession(projectPath, sessionId)
+    }
+  )
+
 
   // Project Management Handlers
   ipcMain.handle(IPC_CHANNELS.PROJECT_OPEN_DIALOG, async (event) => {

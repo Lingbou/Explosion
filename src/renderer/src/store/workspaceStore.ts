@@ -1,3 +1,4 @@
+import { useAgentStore } from './agentStore'
 import { create } from 'zustand'
 import { formatChineseManuscript } from '../lib/typography'
 import { validateSelection } from '../lib/selection'
@@ -216,6 +217,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           selectedText: null,
           selectionRange: null
         })
+        useAgentStore.getState().initProjectSessions(data.path)
       }
     } catch {
       // ignore
@@ -241,6 +243,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       selectedText: null,
       selectionRange: null
     })
+    useAgentStore.getState().initProjectSessions(null)
   },
 
   setProjectTitle: (title: string) => {

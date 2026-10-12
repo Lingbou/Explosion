@@ -1,40 +1,19 @@
 import { create } from 'zustand'
-import { AgentStreamEvent, AgentTaskOptions, SubAgentTaskInfo } from '../../../shared/types/ipc'
+import {
+  AgentMessage,
+  AgentSession,
+  AgentStreamEvent,
+  AgentTaskOptions,
+  AgentTraceStep,
+  SubAgentTaskInfo
+} from '../../../shared/types/ipc'
 import { stripMarkdownMarks } from '../lib/typography'
 import { generateSessionTitle } from '../../../shared/utils/session'
+import { migrateLocalStorageSessions } from '../lib/session-migration'
 
 export { generateSessionTitle } from '../../../shared/utils/session'
-
-export interface AgentTraceStep {
-  id: string
-  type: 'tool_call'
-  toolName: string
-  args: Record<string, unknown>
-  result?: string
-  error?: string
-  durationMs?: number
-  status: 'running' | 'success' | 'error'
-  timestamp: number
-}
-
-export interface AgentMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  thinking?: string
-  traces?: AgentTraceStep[]
-  subagents?: SubAgentTaskInfo[]
-  selectedText?: string
-  timestamp: number
-}
-
-export interface AgentSession {
-  id: string
-  title: string
-  messages: AgentMessage[]
-  createdAt: number
-  updatedAt: number
-}
+export { migrateLocalStorageSessions } from '../lib/session-migration'
+export type { AgentTraceStep, AgentMessage, AgentSession }
 
 interface AgentState {
   sessions: AgentSession[]
@@ -45,7 +24,9 @@ interface AgentState {
   currentDelta: string
   currentTraces: AgentTraceStep[]
   currentSubagents: SubAgentTaskInfo[]
+  currentProjectPath: string | null
 
+  initProjectSessions: (projectPath: string | null) => Promise<void>
   createSession: () => string
   switchSession: (sessionId: string) => void
   deleteSession: (sessionId: string) => void
@@ -64,66 +45,95 @@ interface AgentState {
   abortTask: () => void
 }
 
-const STORAGE_KEY_SESSIONS = 'explosion:agent-sessions'
-const STORAGE_KEY_ACTIVE_ID = 'explosion:agent-active-session-id'
-
-function loadInitialSessions(): { sessions: AgentSession[]; activeSessionId: string } {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_SESSIONS)
-    if (raw) {
-      const parsed = JSON.parse(raw) as AgentSession[]
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // Filter out legacy empty sessions from storage
-        const meaningful = parsed.filter((s) => s.messages && s.messages.length > 0)
-        if (meaningful.length > 0) {
-          const savedActiveId = localStorage.getItem(STORAGE_KEY_ACTIVE_ID)
-          const activeId = savedActiveId && meaningful.some((s) => s.id === savedActiveId)
-            ? savedActiveId
-            : meaningful[0].id
-          return { sessions: meaningful, activeSessionId: activeId }
-        }
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  const initialSession: AgentSession = {
+function createInitialBlankSession(projectPath?: string | null): AgentSession {
+  return {
     id: `session-${Date.now()}`,
     title: '新会话',
+    projectPath: projectPath || undefined,
     messages: [],
     createdAt: Date.now(),
     updatedAt: Date.now()
   }
-
-  return { sessions: [initialSession], activeSessionId: initialSession.id }
 }
 
-function saveSessionsToStorage(sessions: AgentSession[], activeId: string): void {
-  try {
-    // Only persist sessions with messages, plus active session if it's currently selected
-    const toSave = sessions.filter((s) => s.messages.length > 0 || s.id === activeId)
-    localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(toSave))
-    localStorage.setItem(STORAGE_KEY_ACTIVE_ID, activeId)
-  } catch {
-    // ignore
-  }
-}
-
-const initialData = loadInitialSessions()
+const initialSession = createInitialBlankSession()
 
 export const useAgentStore = create<AgentState>((set, get) => ({
-  sessions: initialData.sessions,
-  activeSessionId: initialData.activeSessionId,
+  sessions: [initialSession],
+  activeSessionId: initialSession.id,
   isRunning: false,
   currentTaskId: null,
   currentThinking: '',
   currentDelta: '',
   currentTraces: [],
   currentSubagents: [],
+  currentProjectPath: null,
+
+  initProjectSessions: async (projectPath: string | null) => {
+    set({ currentProjectPath: projectPath })
+
+    if (!projectPath) {
+      const initial = createInitialBlankSession(null)
+      set({
+        sessions: [initial],
+        activeSessionId: initial.id,
+        currentThinking: '',
+        currentDelta: '',
+        currentTraces: [],
+        currentSubagents: []
+      })
+      return
+    }
+
+    try {
+      let diskSessions: AgentSession[] = []
+      if (window?.api?.listAgentSessions) {
+        diskSessions = await window.api.listAgentSessions({ projectPath })
+      }
+
+      const migrated = await migrateLocalStorageSessions(projectPath, diskSessions)
+      if (migrated.length > 0) {
+        if (window?.api?.listAgentSessions) {
+          diskSessions = await window.api.listAgentSessions({ projectPath })
+        } else {
+          const existingIds = new Set(diskSessions.map((s) => s.id))
+          for (const m of migrated) {
+            if (!existingIds.has(m.id)) {
+              diskSessions.push(m)
+            }
+          }
+        }
+      }
+
+      const meaningful = diskSessions.filter((s) => s.messages && s.messages.length > 0)
+
+      if (meaningful.length > 0) {
+        set({
+          sessions: meaningful,
+          activeSessionId: meaningful[0].id,
+          currentThinking: '',
+          currentDelta: '',
+          currentTraces: [],
+          currentSubagents: []
+        })
+      } else {
+        const fresh = createInitialBlankSession(projectPath)
+        set({
+          sessions: [fresh],
+          activeSessionId: fresh.id,
+          currentThinking: '',
+          currentDelta: '',
+          currentTraces: [],
+          currentSubagents: []
+        })
+      }
+    } catch (err) {
+      console.error('Failed to init project agent sessions:', err)
+    }
+  },
 
   createSession: () => {
-    const { sessions, activeSessionId } = get()
+    const { sessions, activeSessionId, currentProjectPath } = get()
     const current = sessions.find((s) => s.id === activeSessionId)
 
     // Prohibit duplicate empty sessions: if current session has 0 messages, ensure its title resets to '新会话'
@@ -138,7 +148,13 @@ export const useAgentStore = create<AgentState>((set, get) => ({
           currentTraces: [],
           currentSubagents: []
         })
-        saveSessionsToStorage(updated, current.id)
+        if (currentProjectPath && window?.api?.renameAgentSession) {
+          window.api.renameAgentSession({
+            projectPath: currentProjectPath,
+            sessionId: current.id,
+            title: '新会话'
+          }).catch(() => {})
+        }
       }
       return current.id
     }
@@ -146,6 +162,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     const newSession: AgentSession = {
       id: `session-${Date.now()}`,
       title: '新会话',
+      projectPath: currentProjectPath || undefined,
       messages: [],
       createdAt: Date.now(),
       updatedAt: Date.now()
@@ -163,7 +180,6 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       currentTraces: [],
       currentSubagents: []
     })
-    saveSessionsToStorage(updatedSessions, newSession.id)
     return newSession.id
   },
 
@@ -184,21 +200,21 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       currentDelta: '',
       currentTraces: []
     })
-    saveSessionsToStorage(cleaned, sessionId)
   },
 
   deleteSession: (sessionId: string) => {
-    const { sessions, activeSessionId } = get()
+    const { sessions, activeSessionId, currentProjectPath } = get()
     const remaining = sessions.filter((s) => s.id !== sessionId)
 
+    if (currentProjectPath && window?.api?.deleteAgentSession) {
+      window.api.deleteAgentSession({
+        projectPath: currentProjectPath,
+        sessionId
+      }).catch(() => {})
+    }
+
     if (remaining.length === 0) {
-      const freshSession: AgentSession = {
-        id: `session-${Date.now()}`,
-        title: '新会话',
-        messages: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      }
+      const freshSession = createInitialBlankSession(currentProjectPath)
       set({
         sessions: [freshSession],
         activeSessionId: freshSession.id,
@@ -207,7 +223,6 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         currentTraces: [],
         currentSubagents: []
       })
-      saveSessionsToStorage([freshSession], freshSession.id)
       return
     }
 
@@ -223,19 +238,27 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       currentDelta: '',
       currentTraces: []
     })
-    saveSessionsToStorage(remaining, nextActiveId)
   },
 
   renameSession: (sessionId: string, title: string) => {
+    const trimmedTitle = title.trim() || '未命名会话'
     const updated = get().sessions.map((s) =>
-      s.id === sessionId ? { ...s, title: title.trim() || '未命名会话', updatedAt: Date.now() } : s
+      s.id === sessionId ? { ...s, title: trimmedTitle, updatedAt: Date.now() } : s
     )
     set({ sessions: updated })
-    saveSessionsToStorage(updated, get().activeSessionId)
+
+    const { currentProjectPath } = get()
+    if (currentProjectPath && window?.api?.renameAgentSession) {
+      window.api.renameAgentSession({
+        projectPath: currentProjectPath,
+        sessionId,
+        title: trimmedTitle
+      }).catch(() => {})
+    }
   },
 
   clearMessages: () => {
-    const { sessions, activeSessionId } = get()
+    const { sessions, activeSessionId, currentProjectPath } = get()
     const updated = sessions.map((s) =>
       s.id === activeSessionId
         ? { ...s, title: '新会话', messages: [], updatedAt: Date.now() }
@@ -248,12 +271,24 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       currentTraces: [],
       currentSubagents: []
     })
-    saveSessionsToStorage(updated, activeSessionId)
+
+    const clearedSession = updated.find((s) => s.id === activeSessionId)
+    if (currentProjectPath && clearedSession && window?.api?.saveAgentSession) {
+      window.api.saveAgentSession({
+        projectPath: currentProjectPath,
+        session: clearedSession
+      }).catch(() => {})
+    }
   },
 
   sendTask: async (prompt: string, contextParams) => {
-    const { sessions, activeSessionId, isRunning } = get()
+    const { sessions, activeSessionId, isRunning, currentProjectPath } = get()
     if (isRunning || !prompt.trim()) return
+
+    const effectiveProjectPath = contextParams.projectPath || currentProjectPath
+    if (effectiveProjectPath && effectiveProjectPath !== currentProjectPath) {
+      set({ currentProjectPath: effectiveProjectPath })
+    }
 
     let currentSession = sessions.find((s) => s.id === activeSessionId)
     if (!currentSession) {
@@ -276,10 +311,16 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     }
 
     const updatedMessagesWithUser = [...currentSession.messages, userMessage]
+    const updatedSessionWithUser: AgentSession = {
+      ...currentSession,
+      title: sessionTitle,
+      projectPath: effectiveProjectPath || undefined,
+      messages: updatedMessagesWithUser,
+      updatedAt: Date.now()
+    }
+
     const updatedSessionsWithUser = get().sessions.map((s) =>
-      s.id === currentSession!.id
-        ? { ...s, title: sessionTitle, messages: updatedMessagesWithUser, updatedAt: Date.now() }
-        : s
+      s.id === currentSession!.id ? updatedSessionWithUser : s
     )
 
     set({
@@ -290,7 +331,13 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       currentTraces: [],
       currentSubagents: []
     })
-    saveSessionsToStorage(updatedSessionsWithUser, currentSession.id)
+
+    if (effectiveProjectPath && window?.api?.saveAgentSession) {
+      window.api.saveAgentSession({
+        projectPath: effectiveProjectPath,
+        session: updatedSessionWithUser
+      }).catch(() => {})
+    }
 
     const taskOptions: AgentTaskOptions = {
       userPrompt: prompt.trim(),
@@ -354,7 +401,11 @@ export const useAgentStore = create<AgentState>((set, get) => ({
           const assistantMsg: AgentMessage = {
             id: `msg-${Date.now()}-a`,
             role: 'assistant',
-            content: cleanOutput || (tracesList.length > 0 || subagentsList.length > 0 ? '已完成所有自主工具调用调度。' : '完成。'),
+            content:
+              cleanOutput ||
+              (tracesList.length > 0 || subagentsList.length > 0
+                ? '已完成所有自主工具调用调度。'
+                : '完成。'),
             thinking: accumulatedThinking || undefined,
             traces: tracesList.length > 0 ? tracesList : undefined,
             subagents: subagentsList.length > 0 ? subagentsList : undefined,
@@ -376,7 +427,14 @@ export const useAgentStore = create<AgentState>((set, get) => ({
             currentTraces: [],
             currentSubagents: []
           })
-          saveSessionsToStorage(finalizedSessions, currentSession.id)
+
+          const targetSession = finalizedSessions.find((s) => s.id === currentSession!.id)
+          if (effectiveProjectPath && targetSession && window?.api?.saveAgentSession) {
+            window.api.saveAgentSession({
+              projectPath: effectiveProjectPath,
+              session: targetSession
+            }).catch(() => {})
+          }
           handle.unsubscribe()
         } else if (event.type === 'error') {
           const errorMsg: AgentMessage = {
@@ -403,7 +461,14 @@ export const useAgentStore = create<AgentState>((set, get) => ({
             currentTraces: [],
             currentSubagents: []
           })
-          saveSessionsToStorage(finalizedSessions, currentSession.id)
+
+          const targetSession = finalizedSessions.find((s) => s.id === currentSession!.id)
+          if (effectiveProjectPath && targetSession && window?.api?.saveAgentSession) {
+            window.api.saveAgentSession({
+              projectPath: effectiveProjectPath,
+              session: targetSession
+            }).catch(() => {})
+          }
           handle.unsubscribe()
         }
       })
@@ -432,7 +497,14 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         currentTraces: [],
         currentSubagents: []
       })
-      saveSessionsToStorage(finalizedSessions, currentSession.id)
+
+      const targetSession = finalizedSessions.find((s) => s.id === currentSession!.id)
+      if (effectiveProjectPath && targetSession && window?.api?.saveAgentSession) {
+        window.api.saveAgentSession({
+          projectPath: effectiveProjectPath,
+          session: targetSession
+        }).catch(() => {})
+      }
     }
   },
 
