@@ -1,11 +1,19 @@
 import { defineConfig } from 'vitest/config'
 import { resolve } from 'path'
 
+const isInsideTemp = process.cwd().includes('/.temp/')
+
 export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    setupFiles: ['./tests/setup.ts']
+    setupFiles: ['./tests/setup.ts'],
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/out/**',
+      ...(isInsideTemp ? [] : ['**/.temp/**'])
+    ]
   },
   resolve: {
     alias: {

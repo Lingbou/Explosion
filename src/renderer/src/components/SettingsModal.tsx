@@ -34,6 +34,7 @@ export const SettingsModal: React.FC = () => {
   const [presetId, setPresetId] = useState<ProviderPresetId>(config.provider.presetId || 'deepseek')
   const [baseUrl, setBaseUrl] = useState(config.provider.baseUrl)
   const [apiKey, setApiKey] = useState(config.provider.apiKey)
+  const [isApiKeyModified, setIsApiKeyModified] = useState(false)
   const [protocol, setProtocol] = useState<LLMProtocol>(config.provider.protocol)
   const [activeModel, setActiveModel] = useState(config.provider.activeModel)
   const [models, setModels] = useState<string[]>(config.provider.availableModels || [])
@@ -57,6 +58,7 @@ export const SettingsModal: React.FC = () => {
       setPresetId(config.provider.presetId || 'deepseek')
       setBaseUrl(config.provider.baseUrl)
       setApiKey(config.provider.apiKey)
+      setIsApiKeyModified(false)
       setProtocol(config.provider.protocol)
       setActiveModel(config.provider.activeModel)
       setModels(config.provider.availableModels || [])
@@ -86,6 +88,14 @@ export const SettingsModal: React.FC = () => {
     setModels(preset.defaultModels)
     setActiveModel(preset.recommendedModel || preset.defaultModels[0] || '')
     setTestResult(null)
+
+    if (id === config.provider.presetId) {
+      setApiKey(config.provider.apiKey)
+      setIsApiKeyModified(false)
+    } else {
+      setApiKey('')
+      setIsApiKeyModified(true)
+    }
   }
 
   const handleTestConnection = async () => {
@@ -96,7 +106,7 @@ export const SettingsModal: React.FC = () => {
     try {
       const res = await window.api.testConnection({
         baseUrl: baseUrl.trim(),
-        apiKey: apiKey.trim(),
+        apiKey: isApiKeyModified ? apiKey.trim() : '',
         protocol,
         model: activeModel.trim()
       })
@@ -125,7 +135,7 @@ export const SettingsModal: React.FC = () => {
     try {
       const res = await window.api.fetchModels({
         baseUrl: baseUrl.trim(),
-        apiKey: apiKey.trim(),
+        apiKey: isApiKeyModified ? apiKey.trim() : '',
         protocol
       })
 
@@ -167,7 +177,9 @@ export const SettingsModal: React.FC = () => {
         presetId,
         name: currentPreset.name,
         baseUrl: baseUrl.trim(),
-        apiKey: apiKey.trim(),
+        ...(isApiKeyModified
+          ? { apiKey: apiKey.trim(), hasKey: apiKey.trim().length > 0 }
+          : { apiKey: config.provider.apiKey, hasKey: config.provider.hasKey }),
         protocol,
         activeModel: activeModel.trim(),
         availableModels: models,
@@ -191,18 +203,23 @@ export const SettingsModal: React.FC = () => {
     setIsSettingsOpen(false)
   }
 
+  const handleReset = async () => {
+    await resetConfig()
+    setIsApiKeyModified(false)
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-150">
       <div className="w-full max-w-xl bg-white dark:bg-[#1f1e1c] border border-stone-200 dark:border-stone-800 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-5 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between">
+        <div className="p-4 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between bg-stone-50/50 dark:bg-[#181716]/50">
           <div className="flex items-center gap-2">
-            <Sliders className="w-4 h-4 text-stone-800 dark:text-stone-200" />
-            <h3 className="font-semibold text-stone-900 dark:text-stone-100 text-sm">设置与偏好</h3>
+            <Sliders className="w-4 h-4 text-stone-600 dark:text-stone-300" />
+            <h2 className="font-semibold text-stone-800 dark:text-stone-200 text-sm">全局系统设置</h2>
           </div>
           <button
             onClick={() => setIsSettingsOpen(false)}
-            className="p-1 rounded-md text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+            className="p-1 hover:bg-stone-200/50 dark:hover:bg-stone-800 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -325,22 +342,23 @@ export const SettingsModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Section: Provider Preset */}
+          {/* Section: Provider Presets */}
           <div>
-            <label className="block font-medium text-stone-700 dark:text-stone-300 mb-1.5">服务商预设</label>
-            <div className="grid grid-cols-4 gap-2">
+            <label className="block font-medium text-stone-700 dark:text-stone-300 mb-1.5">快捷服务商预设</label>
+            <div className="grid grid-cols-4 gap-1.5">
               {PRESET_LIST.map((preset) => (
                 <button
                   key={preset.id}
                   type="button"
                   onClick={() => handlePresetSelect(preset.id)}
-                  className={`p-2 rounded-lg border text-xs transition-all cursor-pointer ${
+                  className={`p-2 rounded-lg border text-left transition-all cursor-pointer ${
                     presetId === preset.id
-                      ? 'border-stone-900 dark:border-stone-100 bg-stone-50 dark:bg-[#2b2927] text-stone-900 dark:text-stone-100 font-medium'
-                      : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-[#22211f] text-stone-600 dark:text-stone-400 hover:border-stone-300 dark:hover:border-stone-600 hover:text-stone-900 dark:hover:text-stone-100'
+                      ? 'border-stone-800 dark:border-stone-100 bg-stone-50 dark:bg-[#2b2927] font-medium text-stone-900 dark:text-stone-100 shadow-2xs'
+                      : 'border-stone-200 dark:border-stone-700 hover:border-stone-300 dark:hover:border-stone-600 text-stone-600 dark:text-stone-400 bg-white dark:bg-[#22211f]'
                   }`}
                 >
-                  {preset.name}
+                  <div className="text-xs font-semibold">{preset.name}</div>
+                  <div className="text-[10px] text-stone-400 truncate mt-0.5">{preset.description}</div>
                 </button>
               ))}
             </div>
@@ -349,21 +367,21 @@ export const SettingsModal: React.FC = () => {
           {/* Base URL & Protocol */}
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
-              <label className="block font-medium text-stone-700 dark:text-stone-300 mb-1">API Base URL</label>
+              <label className="block font-medium text-stone-700 dark:text-stone-300 mb-1">Base URL</label>
               <input
                 type="text"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder={currentPreset.defaultBaseUrl}
+                placeholder="https://api.deepseek.com"
                 className="w-full bg-white dark:bg-[#181716] border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2 font-mono text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-800 dark:focus:border-stone-400"
               />
             </div>
             <div>
-              <label className="block font-medium text-stone-700 dark:text-stone-300 mb-1">协议标准</label>
+              <label className="block font-medium text-stone-700 dark:text-stone-300 mb-1">协议规范</label>
               <select
                 value={protocol}
                 onChange={(e) => setProtocol(e.target.value as LLMProtocol)}
-                className="w-full bg-white dark:bg-[#181716] border border-stone-200 dark:border-stone-700 rounded-lg px-2 py-2 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-800 dark:focus:border-stone-400"
+                className="w-full bg-white dark:bg-[#181716] border border-stone-200 dark:border-stone-700 rounded-lg px-2.5 py-2 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-800 dark:focus:border-stone-400"
               >
                 <option value="chat_completions">Chat Completions</option>
                 <option value="openai_responses">OpenAI Responses</option>
@@ -374,21 +392,34 @@ export const SettingsModal: React.FC = () => {
 
           {/* API Key */}
           <div>
-            <label className="block font-medium text-stone-700 dark:text-stone-300 mb-1">
-              API Key {currentPreset.requiresApiKey ? '(必需)' : '(可选)'}
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <label className="font-medium text-stone-700 dark:text-stone-300">API Key 凭据</label>
+                {config.provider.hasKey && !isApiKeyModified && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-mono">
+                    已加密存储
+                  </span>
+                )}
+              </div>
+              {!currentPreset.requiresApiKey && (
+                <span className="text-[10px] text-stone-400">无需密钥（可留空）</span>
+              )}
+            </div>
             <div className="relative flex items-center">
               <input
                 type={showApiKey ? 'text' : 'password'}
                 value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                onChange={(e) => {
+                  setApiKey(e.target.value)
+                  setIsApiKeyModified(true)
+                }}
                 placeholder={currentPreset.apiKeyPlaceholder || 'sk-...'}
-                className="w-full bg-white dark:bg-[#181716] border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2 pr-10 font-mono text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-800 dark:focus:border-stone-400"
+                className="w-full bg-white dark:bg-[#181716] border border-stone-200 dark:border-stone-700 rounded-lg pl-3 pr-10 py-2 font-mono text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-800 dark:focus:border-stone-400"
               />
               <button
                 type="button"
                 onClick={() => setShowApiKey(!showApiKey)}
-                className="absolute right-3 p-1 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200"
+                className="absolute right-3 p-1 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 cursor-pointer"
                 tabIndex={-1}
               >
                 {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -497,7 +528,7 @@ export const SettingsModal: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={resetConfig}
+              onClick={handleReset}
               className="px-3 py-1.5 text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 text-xs transition-colors cursor-pointer"
             >
               恢复默认

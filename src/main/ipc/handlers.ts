@@ -1,40 +1,56 @@
 import { ipcMain, clipboard, BrowserWindow } from 'electron'
-import { AgentTaskOptions, IPC_CHANNELS, ProjectChapterFile } from '../../shared/types/ipc'
+import { AgentSession, AgentTaskOptions, IPC_CHANNELS, ProjectChapterFile } from '../../shared/types/ipc'
 import { AppConfig } from '../../shared/types/config'
 import {
   FetchModelsParams,
   LLMGenerateOptions,
   TestConnectionParams
 } from '../../shared/types/llm'
-import { globalConfigStore } from '../config/store'
+import { globalConfigStore, isMaskedApiKey } from '../config/store'
 import { globalLLMAdapter } from '../llm/adapter'
 import { globalProjectManager } from '../project/manager'
 import { globalLibraryManager } from '../library/manager'
 import { globalAgentRunner } from '../agent/runner'
 import { globalSnapshotManager } from '../project/snapshot-manager'
+import { globalSessionManager } from '../agent/session-manager'
 
 export function registerIpcHandlers(): void {
   // Config Handlers
   ipcMain.handle(IPC_CHANNELS.CONFIG_GET, async () => {
-    return globalConfigStore.getConfig()
+    return globalConfigStore.getSanitizedConfig()
   })
 
   ipcMain.handle(IPC_CHANNELS.CONFIG_SAVE, async (_event, config: AppConfig) => {
-    const saved = globalConfigStore.saveConfig(config)
-    return { success: true, config: saved }
+    globalConfigStore.saveConfig(config)
+    return { success: true, config: globalConfigStore.getSanitizedConfig() }
   })
 
   ipcMain.handle(IPC_CHANNELS.CONFIG_RESET, async () => {
-    return globalConfigStore.resetConfig()
+    globalConfigStore.resetConfig()
+    return globalConfigStore.getSanitizedConfig()
   })
 
   // LLM Handlers
   ipcMain.handle(IPC_CHANNELS.LLM_TEST_CONNECTION, async (_event, params: TestConnectionParams) => {
-    return globalLLMAdapter.testConnection(params)
+    const effectiveApiKey =
+      params.apiKey && !isMaskedApiKey(params.apiKey)
+        ? params.apiKey
+        : globalConfigStore.getConfig().provider.apiKey
+    return globalLLMAdapter.testConnection({
+      ...params,
+      apiKey: effectiveApiKey
+    })
   })
 
   ipcMain.handle(IPC_CHANNELS.LLM_FETCH_MODELS, async (_event, params: FetchModelsParams) => {
-    return globalLLMAdapter.fetchModels(params)
+    const effectiveApiKey =
+      params.apiKey && !isMaskedApiKey(params.apiKey)
+        ? params.apiKey
+        : globalConfigStore.getConfig().provider.apiKey
+    return globalLLMAdapter.fetchModels({
+      ...params,
+      apiKey: effectiveApiKey
+    })
   })
 
   ipcMain.handle(IPC_CHANNELS.LLM_GENERATE, async (_event, params: LLMGenerateOptions) => {
@@ -105,6 +121,43 @@ export function registerIpcHandlers(): void {
     return globalAgentRunner.abortTask(taskId)
   })
 
+  // Agent Sessions File Persistence
+  ipcMain.handle(IPC_CHANNELS.AGENT_SESSION_LIST, async (_event, { projectPath }: { projectPath: string }) => {
+    return globalSessionManager.listSessions(projectPath)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.AGENT_SESSION_LOAD,
+    async (_event, { projectPath, sessionId }: { projectPath: string; sessionId: string }) => {
+      return globalSessionManager.loadSession(projectPath, sessionId)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.AGENT_SESSION_SAVE,
+    async (_event, { projectPath, session }: { projectPath: string; session: AgentSession }) => {
+      return globalSessionManager.saveSession(projectPath, session)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.AGENT_SESSION_RENAME,
+    async (
+      _event,
+      { projectPath, sessionId, title }: { projectPath: string; sessionId: string; title: string }
+    ) => {
+      return globalSessionManager.renameSession(projectPath, sessionId, title)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.AGENT_SESSION_DELETE,
+    async (_event, { projectPath, sessionId }: { projectPath: string; sessionId: string }) => {
+      return globalSessionManager.deleteSession(projectPath, sessionId)
+    }
+  )
+
+
   // Project Management Handlers
   ipcMain.handle(IPC_CHANNELS.PROJECT_OPEN_DIALOG, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
@@ -138,19 +191,22 @@ export function registerIpcHandlers(): void {
         projectPath,
         chapterId,
         oldFilename,
-        newTitle
+        newTitle,
+        volume
       }: {
         projectPath: string
         chapterId: string
         oldFilename: string
         newTitle: string
+        volume?: string
       }
     ) => {
       return globalProjectManager.renameProjectChapter(
         projectPath,
         chapterId,
         oldFilename,
-        newTitle
+        newTitle,
+        volume
       )
     }
   )
@@ -159,9 +215,75 @@ export function registerIpcHandlers(): void {
     IPC_CHANNELS.PROJECT_DELETE_CHAPTER,
     async (
       _event,
-      { projectPath, filename }: { projectPath: string; filename: string }
+      { projectPath, filename, volume }: { projectPath: string; filename: string; volume?: string }
     ) => {
-      return globalProjectManager.deleteProjectChapter(projectPath, filename)
+      return globalProjectManager.deleteProjectChapter(projectPath, filename, volume)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_CREATE_VOLUME,
+    async (_event, { projectPath, volumeName }: { projectPath: string; volumeName: string }) => {
+      return globalProjectManager.createVolume(projectPath, volumeName)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_RENAME_VOLUME,
+    async (
+      _event,
+      {
+        projectPath,
+        oldVolumeName,
+        newVolumeName
+      }: { projectPath: string; oldVolumeName: string; newVolumeName: string }
+    ) => {
+      return globalProjectManager.renameVolume(projectPath, oldVolumeName, newVolumeName)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_DELETE_VOLUME,
+    async (
+      _event,
+      {
+        projectPath,
+        volumeName,
+        keepChapters
+      }: { projectPath: string; volumeName: string; keepChapters?: boolean }
+    ) => {
+      return globalProjectManager.deleteVolume(projectPath, volumeName, keepChapters)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_REORDER_CHAPTERS,
+    async (
+      _event,
+      {
+        projectPath,
+        volume,
+        orderedFilenames
+      }: { projectPath: string; volume?: string; orderedFilenames: string[] }
+    ) => {
+      return globalProjectManager.reorderProjectChapters(projectPath, volume, orderedFilenames)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_MOVE_CHAPTER,
+    async (
+      _event,
+      params: {
+        projectPath: string
+        chapterId?: string
+        filename: string
+        sourceVolume?: string
+        targetVolume?: string
+        targetIndex: number
+      }
+    ) => {
+      return globalProjectManager.moveProjectChapter(params.projectPath, params)
     }
   )
 
@@ -169,6 +291,17 @@ export function registerIpcHandlers(): void {
     IPC_CHANNELS.PROJECT_SAVE_META,
     async (_event, { projectPath, title }: { projectPath: string; title: string }) => {
       return globalProjectManager.saveProjectMeta(projectPath, title)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_EXPORT_MANUSCRIPT,
+    async (
+      event,
+      { projectPath, targetPath }: { projectPath: string; targetPath?: string }
+    ) => {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      return globalProjectManager.exportManuscript(projectPath, targetPath, win)
     }
   )
 

@@ -1,8 +1,9 @@
+import { useAgentStore } from './agentStore'
 import { create } from 'zustand'
 import { formatChineseManuscript } from '../lib/typography'
 import { validateSelection } from '../lib/selection'
 import { getNextChapterTitle } from '../../../shared/utils/chineseNumerals'
-import { ProjectChapterFile, StoryBibleData, StoryBibleFile } from '../../../shared/types/ipc'
+import { ProjectChapterFile, StoryBibleData, StoryBibleFile, ManuscriptExportResult } from '../../../shared/types/ipc'
 
 export type Chapter = ProjectChapterFile
 
@@ -10,6 +11,9 @@ interface WorkspaceState {
   projectPath: string | null
   projectTitle: string
   chapters: Chapter[]
+  volumes: string[]
+  selectedVolume: string | null
+  collapsedVolumes: Record<string, boolean>
   activeChapterId: string
 
   // Story Bible & Active Document
@@ -33,7 +37,20 @@ interface WorkspaceState {
   closeProject: () => Promise<void>
   setProjectTitle: (title: string) => void
 
-  // Manuscript Actions
+  // Volume & Manuscript Actions
+  toggleVolumeCollapse: (volumeName: string) => void
+  setSelectedVolume: (volumeName: string | null) => void
+  createVolume: (volumeName: string) => Promise<string | undefined>
+  renameVolume: (oldName: string, newName: string) => Promise<void>
+  deleteVolume: (volumeName: string, keepChapters?: boolean) => Promise<void>
+  reorderChapters: (volume: string | undefined, orderedFilenames: string[]) => Promise<void>
+  moveChapter: (params: {
+    chapterId?: string
+    filename: string
+    sourceVolume?: string
+    targetVolume?: string
+    targetIndex: number
+  }) => Promise<void>
   selectChapter: (id: string) => void
   updateContent: (content: string) => void
   updateChapterTitle: (id: string, title: string) => Promise<void>
@@ -51,6 +68,16 @@ interface WorkspaceState {
   saveActiveDocument: () => Promise<void>
   saveActiveChapter: () => Promise<void>
   insertText: (text: string) => void
+  // Export Actions & State
+  isExporting: boolean
+  exportResult: {
+    visible: boolean
+    filePath: string
+    chapterCount: number
+    totalChars: number
+  } | null
+  dismissExportResult: () => void
+  exportManuscript: () => Promise<ManuscriptExportResult>
 }
 
 const DEFAULT_CHAPTER_TEMPLATE = {
@@ -65,6 +92,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   projectPath: null,
   projectTitle: '',
   chapters: [],
+  volumes: [],
+  selectedVolume: null,
+  collapsedVolumes: {},
   activeChapterId: '',
   storyBible: null,
   activeDocumentType: 'chapter',
@@ -73,6 +103,47 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   lastSavedAt: null,
   selectedText: null,
   selectionRange: null,
+  isExporting: false,
+  exportResult: null,
+  dismissExportResult: () => {
+    set({ exportResult: null })
+  },
+  exportManuscript: async () => {
+    const { projectPath, isDirty, saveActiveDocument, chapters } = get()
+    if (!projectPath) {
+      return { success: false, error: "未打开工程" }
+    }
+    if (chapters.length === 0) {
+      return { success: false, error: "当前工程暂无手稿章节可供导出" }
+    }
+
+    if (isDirty) {
+      await saveActiveDocument()
+    }
+
+    set({ isExporting: true })
+    try {
+      const res = await window.api.exportManuscript({ projectPath })
+      if (res.success && res.filePath) {
+        set({
+          exportResult: {
+            visible: true,
+            filePath: res.filePath,
+            chapterCount: res.chapterCount || chapters.length,
+            totalChars: res.totalChars || 0
+          }
+        })
+      }
+      return res
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "导出异常"
+      }
+    } finally {
+      set({ isExporting: false })
+    }
+  },
 
   initWorkspace: async (lastProjectPath?: string | null) => {
     // Setup Live File Sync listener once
@@ -158,13 +229,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           projectPath: data.path,
           projectTitle: data.title,
           chapters: data.chapters,
-          activeChapterId: data.activeChapterId || data.chapters[0].id,
+          volumes: data.volumes || [],
+          activeChapterId: data.activeChapterId || (data.chapters[0] ? data.chapters[0].id : ''),
           storyBible: data.storyBible || null,
           isDirty: false,
           lastSavedAt: Date.now(),
           selectedText: null,
           selectionRange: null
         })
+        useAgentStore.getState().initProjectSessions(data.path)
       }
     } catch {
       // ignore
@@ -181,6 +254,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       projectPath: null,
       projectTitle: '',
       chapters: [],
+      volumes: [],
+      selectedVolume: null,
+      collapsedVolumes: {},
       activeChapterId: '',
       storyBible: null,
       activeDocumentType: 'chapter',
@@ -190,6 +266,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       selectedText: null,
       selectionRange: null
     })
+    useAgentStore.getState().initProjectSessions(null)
   },
 
   setProjectTitle: (title: string) => {
@@ -200,11 +277,139 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
   },
 
+  toggleVolumeCollapse: (volumeName: string) => {
+    set((state) => ({
+      collapsedVolumes: {
+        ...state.collapsedVolumes,
+        [volumeName]: !state.collapsedVolumes[volumeName]
+      }
+    }))
+  },
+
+  setSelectedVolume: (volumeName: string | null) => {
+    set({ selectedVolume: volumeName })
+  },
+
+  createVolume: async (volumeName: string) => {
+    const { projectPath, volumes } = get()
+    if (!projectPath || !volumeName.trim()) return undefined
+
+    try {
+      const res = await window.api.createProjectVolume({
+        projectPath,
+        volumeName: volumeName.trim()
+      })
+      if (res.success) {
+        const nextVolumes = [...volumes, res.volumeName].sort((a, b) =>
+          a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+        )
+        set((state) => ({
+          volumes: nextVolumes,
+          selectedVolume: res.volumeName,
+          collapsedVolumes: { ...state.collapsedVolumes, [res.volumeName]: false }
+        }))
+        return res.volumeName
+      }
+    } catch {
+      // ignore
+    }
+    return undefined
+  },
+
+  renameVolume: async (oldName: string, newName: string) => {
+    const { projectPath } = get()
+    if (!projectPath || !newName.trim()) return
+
+    try {
+      const res = await window.api.renameProjectVolume({
+        projectPath,
+        oldVolumeName: oldName,
+        newVolumeName: newName.trim()
+      })
+      if (res.success) {
+        await get().loadProjectByPath(projectPath)
+      }
+    } catch {
+      // ignore
+    }
+  },
+
+  deleteVolume: async (volumeName: string, keepChapters: boolean = true) => {
+    const { projectPath } = get()
+    if (!projectPath) return
+
+    try {
+      const res = await window.api.deleteProjectVolume({
+        projectPath,
+        volumeName,
+        keepChapters
+      })
+      if (res.success) {
+        await get().loadProjectByPath(projectPath)
+      }
+    } catch {
+      // ignore
+    }
+  },
+
+  reorderChapters: async (volume: string | undefined, orderedFilenames: string[]) => {
+    const { projectPath } = get()
+    if (!projectPath) return
+
+    try {
+      const res = await window.api.reorderProjectChapters({
+        projectPath,
+        volume,
+        orderedFilenames
+      })
+      if (res.success && res.chapters) {
+        set({ chapters: res.chapters })
+      }
+    } catch {
+      // ignore
+    }
+  },
+
+  moveChapter: async (params: {
+    chapterId?: string
+    filename: string
+    sourceVolume?: string
+    targetVolume?: string
+    targetIndex: number
+  }) => {
+    const { projectPath } = get()
+    if (!projectPath) return
+
+    try {
+      const res = await window.api.moveProjectChapter({
+        projectPath,
+        chapterId: params.chapterId,
+        filename: params.filename,
+        sourceVolume: params.sourceVolume,
+        targetVolume: params.targetVolume,
+        targetIndex: params.targetIndex
+      })
+      if (res.success && res.chapters) {
+        set((state) => ({
+          chapters: res.chapters,
+          selectedVolume: params.targetVolume || null,
+          collapsedVolumes: params.targetVolume
+            ? { ...state.collapsedVolumes, [params.targetVolume]: false }
+            : state.collapsedVolumes
+        }))
+      }
+    } catch {
+      // ignore
+    }
+  },
+
   selectChapter: (id: string) => {
     get().saveActiveDocument()
+    const target = get().chapters.find((c) => c.id === id)
     set({
       activeDocumentType: 'chapter',
       activeChapterId: id,
+      selectedVolume: target?.volume || null,
       activeStoryFile: null,
       isDirty: false,
       selectedText: null,
@@ -251,7 +456,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           projectPath,
           chapterId: id,
           oldFilename: target.filename,
-          newTitle: title
+          newTitle: title,
+          volume: target.volume
         })
         if (res.success) {
           newFilename = res.newFilename
@@ -268,25 +474,59 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   addChapter: async (customTitle?: string, volume?: string) => {
-    const { chapters, projectPath } = get()
+    const { chapters, volumes, activeChapterId, selectedVolume, projectPath } = get()
     if (!projectPath) {
       await get().createProject()
       return
     }
 
+    // Determine target volume:
+    // 1. Explicit volume parameter
+    // 2. Currently selected volume if valid
+    // 3. Current active chapter volume if valid
+    let targetVolume = volume
+    if (targetVolume === undefined) {
+      if (selectedVolume && volumes.includes(selectedVolume)) {
+        targetVolume = selectedVolume
+      } else {
+        const activeChapter = chapters.find((c) => c.id === activeChapterId)
+        if (activeChapter?.volume) {
+          targetVolume = activeChapter.volume
+        }
+      }
+    }
+
+    // Chapters belonging to this volume container
+    const volumeChapters = targetVolume
+      ? chapters.filter((c) => c.volume === targetVolume)
+      : chapters.filter((c) => !c.volume)
+
     const existingTitles = chapters.map((c) => c.title)
     const title = customTitle || getNextChapterTitle(existingTitles)
-    const index = chapters.length + 1
-    const padIndex = String(index).padStart(3, '0')
+
+    // Calculate correct index within this container
+    let nextIndex = volumeChapters.length + 1
+    for (const ch of volumeChapters) {
+      const match = ch.filename.match(/^(\d+)-/)
+      if (match) {
+        const num = parseInt(match[1], 10)
+        if (!isNaN(num) && num >= nextIndex) {
+          nextIndex = num + 1
+        }
+      }
+    }
+
+    const padIndex = String(nextIndex).padStart(3, '0')
     const filename = `${padIndex}-${title}.txt`
-    const newId = `ch-${Date.now()}`
+    const newId = `ch-${targetVolume || 'root'}-${filename}`
 
     const newChapter: Chapter = {
       id: newId,
       title,
       content: '',
       filename,
-      volume,
+      volume: targetVolume,
+      relativePath: targetVolume ? `manuscript/${targetVolume}/${filename}` : `manuscript/${filename}`,
       updatedAt: Date.now()
     }
 
@@ -299,14 +539,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       // ignore
     }
 
-    set({
-      chapters: [...chapters, newChapter],
+    set((state) => ({
+      chapters: [...state.chapters, newChapter],
       activeDocumentType: 'chapter',
       activeChapterId: newId,
+      selectedVolume: targetVolume || null,
+      collapsedVolumes: targetVolume
+        ? { ...state.collapsedVolumes, [targetVolume]: false }
+        : state.collapsedVolumes,
       activeStoryFile: null,
       isDirty: false,
       lastSavedAt: Date.now()
-    })
+    }))
   },
 
   deleteChapter: async (id: string) => {
@@ -317,57 +561,46 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       try {
         await window.api.deleteProjectChapter({
           projectPath,
-          filename: target.filename
+          filename: target.filename,
+          volume: target.volume
         })
       } catch {
         // ignore
       }
     }
 
-    const remaining = chapters.filter((ch) => ch.id !== id)
-
-    if (remaining.length === 0) {
-      const resetChapter: Chapter = {
-        id: `ch-${Date.now()}`,
-        title: DEFAULT_CHAPTER_TEMPLATE.title,
-        content: '',
-        filename: DEFAULT_CHAPTER_TEMPLATE.filename,
-        updatedAt: Date.now()
+    if (projectPath) {
+      await get().loadProjectByPath(projectPath)
+      const freshChapters = get().chapters
+      if (freshChapters.length > 0) {
+        if (!freshChapters.some((c) => c.id === activeChapterId)) {
+          get().selectChapter(freshChapters[0].id)
+        }
+      } else {
+        const resetChapter: Chapter = {
+          id: `ch-${Date.now()}`,
+          title: DEFAULT_CHAPTER_TEMPLATE.title,
+          content: '',
+          filename: DEFAULT_CHAPTER_TEMPLATE.filename,
+          updatedAt: Date.now()
+        }
+        await window.api.saveProjectChapter({
+          projectPath,
+          chapter: resetChapter
+        })
+        set({
+          chapters: [resetChapter],
+          activeDocumentType: 'chapter',
+          activeChapterId: resetChapter.id,
+          activeStoryFile: null,
+          isDirty: false,
+          lastSavedAt: Date.now()
+        })
       }
-      if (projectPath) {
-        window.api
-          .saveProjectChapter({
-            projectPath,
-            chapter: resetChapter
-          })
-          .catch(() => {})
-      }
-      set({
-        chapters: [resetChapter],
-        activeDocumentType: 'chapter',
-        activeChapterId: resetChapter.id,
-        activeStoryFile: null,
-        isDirty: false,
-        lastSavedAt: Date.now()
-      })
-      return
     }
-
-    let nextActiveId = activeChapterId
-    if (activeChapterId === id) {
-      const deletedIndex = chapters.findIndex((ch) => ch.id === id)
-      const nextIndex = Math.max(0, deletedIndex - 1)
-      nextActiveId = remaining[nextIndex]?.id || remaining[0].id
-    }
-
-    set({
-      chapters: remaining,
-      activeChapterId: nextActiveId,
-      isDirty: false
-    })
   },
 
-  createStoryFile: async (type: 'outline' | 'character', title?: string) => {
+    createStoryFile: async (type: 'outline' | 'character', title?: string) => {
     const { projectPath } = get()
     if (!projectPath) return
 

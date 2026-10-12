@@ -4,11 +4,13 @@ import {
   ElectronApi,
   ProjectData,
   ProjectChapterFile,
+  ManuscriptExportResult,
   ProjectSnapshot,
   StoryBibleFile,
   LibraryBook,
   LibraryBookContent,
   AgentTaskOptions,
+  AgentSession,
   AgentStreamEvent,
   ProjectFileChangedPayload
 } from '../shared/types/ipc'
@@ -109,6 +111,23 @@ const api: ElectronApi = {
   agentAbortTask: (taskId: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.AGENT_ABORT_TASK, taskId),
 
+  // Agent Sessions File Persistence
+  listAgentSessions: (params: { projectPath: string }): Promise<AgentSession[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AGENT_SESSION_LIST, params),
+
+  loadAgentSession: (params: { projectPath: string; sessionId: string }): Promise<AgentSession | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AGENT_SESSION_LOAD, params),
+
+  saveAgentSession: (params: { projectPath: string; session: AgentSession }): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AGENT_SESSION_SAVE, params),
+
+  renameAgentSession: (params: { projectPath: string; sessionId: string; title: string }): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AGENT_SESSION_RENAME, params),
+
+  deleteAgentSession: (params: { projectPath: string; sessionId: string }): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AGENT_SESSION_DELETE, params),
+
+
   // Project Management & Live File Sync
   openProjectDialog: (): Promise<string | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.PROJECT_OPEN_DIALOG),
@@ -129,18 +148,63 @@ const api: ElectronApi = {
     chapterId: string
     oldFilename: string
     newTitle: string
+    volume?: string
   }): Promise<{ success: boolean; newFilename: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.PROJECT_RENAME_CHAPTER, params),
 
   deleteProjectChapter: (params: {
     projectPath: string
     filename: string
+    volume?: string
   }): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_DELETE_CHAPTER, params),
+
+  createProjectVolume: (params: {
+    projectPath: string
+    volumeName: string
+  }): Promise<{ success: boolean; volumeName: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_CREATE_VOLUME, params),
+
+  renameProjectVolume: (params: {
+    projectPath: string
+    oldVolumeName: string
+    newVolumeName: string
+  }): Promise<{ success: boolean; newVolumeName: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_RENAME_VOLUME, params),
+
+  deleteProjectVolume: (params: {
+    projectPath: string
+    volumeName: string
+    keepChapters?: boolean
+  }): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_DELETE_VOLUME, params),
+
+  reorderProjectChapters: (params: {
+    projectPath: string
+    volume?: string
+    orderedFilenames: string[]
+  }): Promise<{ success: boolean; chapters: ProjectChapterFile[] }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_REORDER_CHAPTERS, params),
+
+  moveProjectChapter: (params: {
+    projectPath: string
+    chapterId?: string
+    filename: string
+    sourceVolume?: string
+    targetVolume?: string
+    targetIndex: number
+  }): Promise<{ success: boolean; chapters: ProjectChapterFile[] }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_MOVE_CHAPTER, params),
 
   saveProjectMeta: (params: { projectPath: string; title: string }): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.PROJECT_SAVE_META, params),
 
   closeProject: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_CLOSE),
+
+  exportManuscript: (params: {
+    projectPath: string
+    targetPath?: string
+  }): Promise<ManuscriptExportResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_EXPORT_MANUSCRIPT, params),
 
   onProjectFileChanged: (
     callback: (payload: ProjectFileChangedPayload) => void

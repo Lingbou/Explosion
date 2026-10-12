@@ -7,10 +7,66 @@ import {
   ProjectData,
   ProjectFileChangedPayload,
   StoryBibleData,
-  StoryBibleFile
+  StoryBibleFile,
+  ManuscriptExportResult
 } from '../../shared/types/ipc'
+import { exportManuscriptToFile } from './exporter'
 import { ConfigStore, globalConfigStore } from '../config/store'
 import { globalSnapshotManager } from './snapshot-manager'
+
+function extractCleanTitle(filename: string): string {
+  let name = path.basename(filename, '.txt')
+  name = name.replace(/^\.moving-\d+-/, '')
+  const match = name.match(/^\d+-(.+)$/)
+  if (match) {
+    name = match[1]
+  }
+  return name.trim() || '未命名章节'
+}
+
+function formatChapterFilename(orderIndex: number, cleanTitle: string): string {
+  const pad = String(orderIndex).padStart(3, '0')
+  const safeTitle = cleanTitle.replace(/[\\/:*?"<>|]/g, '_').trim() || '未命名章节'
+  return `${pad}-${safeTitle}.txt`
+}
+
+function renumberDirectoryFiles(dir: string, orderedFilenames: string[]): void {
+  if (!fs.existsSync(dir)) return
+
+  const renames: { oldName: string; newName: string; oldPath: string; newPath: string }[] = []
+
+  orderedFilenames.forEach((filename, idx) => {
+    const cleanTitle = extractCleanTitle(filename)
+    const newFilename = formatChapterFilename(idx + 1, cleanTitle)
+    renames.push({
+      oldName: filename,
+      newName: newFilename,
+      oldPath: path.join(dir, filename),
+      newPath: path.join(dir, newFilename)
+    })
+  })
+
+  // Phase 1: Rename files that change name to unique temporary names
+  const temps: { tempPath: string; newPath: string }[] = []
+  const timestamp = Date.now()
+  for (let i = 0; i < renames.length; i++) {
+    const item = renames[i]
+    if (item.oldName === item.newName) continue
+    if (fs.existsSync(item.oldPath)) {
+      const tempPath = path.join(
+        dir,
+        `.tmp-${timestamp}-${i}-${Math.random().toString(36).substring(2, 6)}.tmp`
+      )
+      fs.renameSync(item.oldPath, tempPath)
+      temps.push({ tempPath, newPath: item.newPath })
+    }
+  }
+
+  // Phase 2: Rename temporary files to their final names
+  for (const item of temps) {
+    fs.renameSync(item.tempPath, item.newPath)
+  }
+}
 
 export class ProjectManager {
   private configStore: ConfigStore
@@ -248,6 +304,209 @@ export class ProjectManager {
     return { outlines, characters, ledger }
   }
 
+  public scanManuscript(projectPath: string): { chapters: ProjectChapterFile[]; volumes: string[] } {
+    const manuscriptDir = path.join(projectPath, 'manuscript')
+    if (!fs.existsSync(manuscriptDir)) {
+      fs.mkdirSync(manuscriptDir, { recursive: true })
+    }
+
+    const volumes: string[] = []
+    const chapters: ProjectChapterFile[] = []
+
+    const rootEntries = fs.readdirSync(manuscriptDir, { withFileTypes: true })
+
+    for (const entry of rootEntries) {
+      if (entry.name.startsWith('.')) continue
+      if (entry.isDirectory()) {
+        volumes.push(entry.name)
+      }
+    }
+    volumes.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+
+    // Flat chapters in root
+    const rootFiles = rootEntries
+      .filter((e) => e.isFile() && e.name.endsWith('.txt') && !e.name.startsWith('.'))
+      .map((e) => e.name)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+
+    for (const file of rootFiles) {
+      const filePath = path.join(manuscriptDir, file)
+      let content = ''
+      try {
+        content = fs.readFileSync(filePath, 'utf-8')
+      } catch {
+        content = ''
+      }
+      const stat = fs.statSync(filePath)
+      const cleanTitle = extractCleanTitle(file)
+      chapters.push({
+        id: `ch-root-${file}`,
+        title: cleanTitle,
+        content,
+        filename: file,
+        relativePath: path.join('manuscript', file),
+        updatedAt: stat.mtimeMs
+      })
+    }
+
+    // Chapters in volumes
+    for (const volumeName of volumes) {
+      const volumeDir = path.join(manuscriptDir, volumeName)
+      const volFiles = fs
+        .readdirSync(volumeDir)
+        .filter((f) => f.endsWith('.txt') && !f.startsWith('.'))
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+
+      for (const file of volFiles) {
+        const filePath = path.join(volumeDir, file)
+        let content = ''
+        try {
+          content = fs.readFileSync(filePath, 'utf-8')
+        } catch {
+          content = ''
+        }
+        const stat = fs.statSync(filePath)
+        const cleanTitle = extractCleanTitle(file)
+        chapters.push({
+          id: `ch-${volumeName}-${file}`,
+          title: cleanTitle,
+          content,
+          filename: file,
+          volume: volumeName,
+          relativePath: path.join('manuscript', volumeName, file),
+          updatedAt: stat.mtimeMs
+        })
+      }
+    }
+
+    return { chapters, volumes }
+  }
+
+  public listVolumes(projectPath: string): string[] {
+    const manuscriptDir = path.join(projectPath, 'manuscript')
+    if (!fs.existsSync(manuscriptDir)) return []
+    const entries = fs.readdirSync(manuscriptDir, { withFileTypes: true })
+    const volumes = entries
+      .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+      .map((e) => e.name)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+    return volumes
+  }
+
+  public createVolume(
+    projectPath: string,
+    volumeName: string
+  ): { success: boolean; volumeName: string } {
+    const manuscriptDir = path.join(projectPath, 'manuscript')
+    if (!fs.existsSync(manuscriptDir)) {
+      fs.mkdirSync(manuscriptDir, { recursive: true })
+    }
+
+    let safeName = volumeName.replace(/[\\/:*?"<>|]/g, '_').trim()
+    if (!safeName) {
+      const existing = this.listVolumes(projectPath)
+      safeName = `第${existing.length + 1}卷`
+    }
+
+    let targetDir = path.join(manuscriptDir, safeName)
+    let counter = 1
+    const baseSafeName = safeName
+    while (fs.existsSync(targetDir)) {
+      safeName = `${baseSafeName} (${counter++})`
+      targetDir = path.join(manuscriptDir, safeName)
+    }
+
+    fs.mkdirSync(targetDir, { recursive: true })
+    return { success: true, volumeName: safeName }
+  }
+
+  public renameVolume(
+    projectPath: string,
+    oldVolumeName: string,
+    newVolumeName: string
+  ): { success: boolean; newVolumeName: string } {
+    const manuscriptDir = path.join(projectPath, 'manuscript')
+    const oldPath = path.join(manuscriptDir, oldVolumeName)
+    if (!fs.existsSync(oldPath)) {
+      return { success: false, newVolumeName: oldVolumeName }
+    }
+
+    const safeName = newVolumeName.replace(/[\\/:*?"<>|]/g, '_').trim()
+    if (!safeName) {
+      return { success: false, newVolumeName: oldVolumeName }
+    }
+
+    const newPath = path.join(manuscriptDir, safeName)
+    if (oldPath !== newPath) {
+      if (fs.existsSync(newPath)) {
+        return { success: false, newVolumeName: oldVolumeName }
+      }
+      fs.renameSync(oldPath, newPath)
+    }
+
+    return { success: true, newVolumeName: safeName }
+  }
+
+  public deleteVolume(
+    projectPath: string,
+    volumeName: string,
+    keepChapters: boolean = true
+  ): { success: boolean } {
+    const manuscriptDir = path.join(projectPath, 'manuscript')
+    const volPath = path.join(manuscriptDir, volumeName)
+    if (!fs.existsSync(volPath)) {
+      return { success: true }
+    }
+
+    if (keepChapters) {
+      // Content protection: move all chapters to manuscript/ root
+      const files = fs
+        .readdirSync(volPath)
+        .filter((f) => f.endsWith('.txt') && !f.startsWith('.'))
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+
+      const rootExisting = fs
+        .readdirSync(manuscriptDir)
+        .filter((f) => f.endsWith('.txt') && !f.startsWith('.'))
+
+      const allFiles = [...rootExisting]
+      for (const f of files) {
+        const srcFile = path.join(volPath, f)
+        let destFilename = f
+        let counter = 1
+        while (fs.existsSync(path.join(manuscriptDir, destFilename))) {
+          const clean = extractCleanTitle(f)
+          destFilename = `${String(allFiles.length + counter).padStart(3, '0')}-${clean}.txt`
+          counter++
+        }
+        const destFile = path.join(manuscriptDir, destFilename)
+        fs.renameSync(srcFile, destFile)
+        allFiles.push(destFilename)
+      }
+
+      renumberDirectoryFiles(manuscriptDir, allFiles)
+      try {
+        fs.rmSync(volPath, { recursive: true, force: true })
+      } catch {}
+    } else {
+      // Create snapshots before deleting for ultimate safety
+      try {
+        const files = fs.readdirSync(volPath).filter((f) => f.endsWith('.txt'))
+        for (const f of files) {
+          const filePath = path.join(volPath, f)
+          try {
+            const content = fs.readFileSync(filePath, 'utf-8')
+            globalSnapshotManager.createSnapshot(projectPath, filePath, content, 'manual').catch(() => {})
+          } catch {}
+        }
+      } catch {}
+
+      fs.rmSync(volPath, { recursive: true, force: true })
+    }
+
+    return { success: true }
+  }
+
   public async loadProject(projectPath: string): Promise<ProjectData> {
     if (!fs.existsSync(projectPath)) {
       fs.mkdirSync(projectPath, { recursive: true })
@@ -278,85 +537,18 @@ export class ProjectManager {
       fs.writeFileSync(metaFile, JSON.stringify({ title, createdAt: Date.now() }, null, 2), 'utf-8')
     }
 
-    // Read chapters from manuscript/ with multi-volume support
-    const chapters: ProjectChapterFile[] = []
-    const rootEntries = fs.readdirSync(manuscriptDir, { withFileTypes: true })
+    // Read chapters & volumes from manuscript/ with multi-volume support
+    const scanned = this.scanManuscript(projectPath)
+    const chapters = scanned.chapters
+    const volumes = scanned.volumes
 
-    for (const entry of rootEntries) {
-      if (entry.name.startsWith('.')) continue
-
-      if (entry.isDirectory()) {
-        const volumeName = entry.name
-        const volumeDir = path.join(manuscriptDir, volumeName)
-        const volFiles = fs
-          .readdirSync(volumeDir)
-          .filter((f) => f.endsWith('.txt') && !f.startsWith('.'))
-          .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
-
-        for (const file of volFiles) {
-          const filePath = path.join(volumeDir, file)
-          let content = ''
-          try {
-            content = fs.readFileSync(filePath, 'utf-8')
-          } catch {
-            content = ''
-          }
-
-          const stat = fs.statSync(filePath)
-          let cleanTitle = path.basename(file, '.txt')
-          const match = cleanTitle.match(/^\d+-(.+)$/)
-          if (match) cleanTitle = match[1]
-
-          chapters.push({
-            id: `ch-${volumeName}-${file}`,
-            title: cleanTitle,
-            content,
-            filename: file,
-            volume: volumeName,
-            relativePath: path.join('manuscript', volumeName, file),
-            updatedAt: stat.mtimeMs
-          })
-        }
-      } else if (entry.isFile() && entry.name.endsWith('.txt')) {
-        const filePath = path.join(manuscriptDir, entry.name)
-        let content = ''
-        try {
-          content = fs.readFileSync(filePath, 'utf-8')
-        } catch {
-          content = ''
-        }
-
-        const stat = fs.statSync(filePath)
-        let cleanTitle = path.basename(entry.name, '.txt')
-        const match = cleanTitle.match(/^\d+-(.+)$/)
-        if (match) cleanTitle = match[1]
-
-        chapters.push({
-          id: `ch-root-${entry.name}`,
-          title: cleanTitle,
-          content,
-          filename: entry.name,
-          relativePath: path.join('manuscript', entry.name),
-          updatedAt: stat.mtimeMs
-        })
-      }
-    }
-
-    // Sort chapters
-    chapters.sort((a, b) => {
-      if (a.volume && b.volume && a.volume !== b.volume) {
-        return a.volume.localeCompare(b.volume, undefined, { numeric: true, sensitivity: 'base' })
-      }
-      return a.filename.localeCompare(b.filename, undefined, { numeric: true, sensitivity: 'base' })
-    })
-
-    if (chapters.length === 0) {
+    if (volumes.length === 0 && chapters.length === 0) {
       const defaultFilename = '001-第一章.txt'
       const defaultFilePath = path.join(manuscriptDir, defaultFilename)
       fs.writeFileSync(defaultFilePath, '', 'utf-8')
 
       chapters.push({
-        id: 'ch-1',
+        id: 'ch-root-001-第一章.txt',
         title: '第一章',
         content: '',
         filename: defaultFilename,
@@ -380,9 +572,18 @@ export class ProjectManager {
       path: projectPath,
       title,
       chapters,
-      activeChapterId: activeChapterId || chapters[0].id,
+      volumes,
+      activeChapterId: activeChapterId || (chapters.length > 0 ? chapters[0].id : undefined),
       storyBible
     }
+  }
+
+  public async exportManuscript(
+    projectPath: string,
+    targetPath?: string,
+    window?: BrowserWindow | null
+  ): Promise<ManuscriptExportResult> {
+    return exportManuscriptToFile(projectPath, targetPath, window)
   }
 
   public closeCurrentProject(): boolean {
@@ -424,16 +625,30 @@ export class ProjectManager {
     projectPath: string,
     _chapterId: string,
     oldFilename: string,
-    newTitle: string
+    newTitle: string,
+    volume?: string
   ): { success: boolean; newFilename: string } {
     const manuscriptDir = path.join(projectPath, 'manuscript')
-    const oldPath = path.join(manuscriptDir, oldFilename)
+    let targetDir = volume ? path.join(manuscriptDir, volume) : manuscriptDir
+    let oldPath = path.join(targetDir, oldFilename)
+
+    if (!fs.existsSync(oldPath) && !volume) {
+      const volumes = this.listVolumes(projectPath)
+      for (const vol of volumes) {
+        const possiblePath = path.join(manuscriptDir, vol, oldFilename)
+        if (fs.existsSync(possiblePath)) {
+          targetDir = path.join(manuscriptDir, vol)
+          oldPath = possiblePath
+          break
+        }
+      }
+    }
 
     const prefixMatch = oldFilename.match(/^(\d+-)/)
     const prefix = prefixMatch ? prefixMatch[1] : ''
-    const safeTitle = newTitle.replace(/[\\/:*?"<>|]/g, '_')
+    const safeTitle = newTitle.replace(/[\\/:*?"<>|]/g, '_').trim() || '未命名章节'
     const newFilename = `${prefix}${safeTitle}.txt`
-    const newPath = path.join(manuscriptDir, newFilename)
+    const newPath = path.join(targetDir, newFilename)
 
     if (fs.existsSync(oldPath)) {
       if (oldPath !== newPath) {
@@ -446,13 +661,128 @@ export class ProjectManager {
     return { success: true, newFilename }
   }
 
-  public deleteProjectChapter(projectPath: string, filename: string): boolean {
+  public deleteProjectChapter(
+    projectPath: string,
+    filename: string,
+    volume?: string
+  ): boolean {
     const manuscriptDir = path.join(projectPath, 'manuscript')
-    const filePath = path.join(manuscriptDir, filename)
+    let targetDir = volume ? path.join(manuscriptDir, volume) : manuscriptDir
+    let filePath = path.join(targetDir, filename)
+
+    if (!fs.existsSync(filePath) && !volume) {
+      const volumes = this.listVolumes(projectPath)
+      for (const vol of volumes) {
+        const possible = path.join(manuscriptDir, vol, filename)
+        if (fs.existsSync(possible)) {
+          targetDir = path.join(manuscriptDir, vol)
+          filePath = possible
+          break
+        }
+      }
+    }
+
     if (fs.existsSync(filePath)) {
+      try {
+        const content = fs.readFileSync(filePath, 'utf-8')
+        globalSnapshotManager.createSnapshot(projectPath, filePath, content, 'manual').catch(() => {})
+      } catch {}
       fs.unlinkSync(filePath)
     }
+
+    // Renumber remaining chapters in targetDir to ensure continuous numbering with no holes
+    if (fs.existsSync(targetDir)) {
+      const remainingFiles = fs
+        .readdirSync(targetDir)
+        .filter((f) => f.endsWith('.txt') && !f.startsWith('.'))
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+      renumberDirectoryFiles(targetDir, remainingFiles)
+    }
+
     return true
+  }
+
+  public reorderProjectChapters(
+    projectPath: string,
+    volume: string | undefined,
+    orderedFilenames: string[]
+  ): { success: boolean; chapters: ProjectChapterFile[] } {
+    const manuscriptDir = path.join(projectPath, 'manuscript')
+    const dir = volume ? path.join(manuscriptDir, volume) : manuscriptDir
+
+    if (fs.existsSync(dir)) {
+      renumberDirectoryFiles(dir, orderedFilenames)
+    }
+
+    const scanned = this.scanManuscript(projectPath)
+    return { success: true, chapters: scanned.chapters }
+  }
+
+  public moveProjectChapter(
+    projectPath: string,
+    params: {
+      chapterId?: string
+      filename: string
+      sourceVolume?: string
+      targetVolume?: string
+      targetIndex: number
+    }
+  ): { success: boolean; chapters: ProjectChapterFile[] } {
+    const manuscriptDir = path.join(projectPath, 'manuscript')
+    const srcDir = params.sourceVolume ? path.join(manuscriptDir, params.sourceVolume) : manuscriptDir
+    const dstDir = params.targetVolume ? path.join(manuscriptDir, params.targetVolume) : manuscriptDir
+    const srcFile = path.join(srcDir, params.filename)
+
+    if (!fs.existsSync(srcFile)) {
+      const scanned = this.scanManuscript(projectPath)
+      return { success: false, chapters: scanned.chapters }
+    }
+
+    if (srcDir === dstDir) {
+      // Reordering within the same volume / flat list
+      const existing = fs
+        .readdirSync(srcDir)
+        .filter((f) => f.endsWith('.txt') && !f.startsWith('.'))
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+
+      const filtered = existing.filter((f) => f !== params.filename)
+      const targetIndex = Math.max(0, Math.min(params.targetIndex, filtered.length))
+      filtered.splice(targetIndex, 0, params.filename)
+
+      renumberDirectoryFiles(srcDir, filtered)
+    } else {
+      // Cross-volume move
+      if (!fs.existsSync(dstDir)) {
+        fs.mkdirSync(dstDir, { recursive: true })
+      }
+
+      // 1. Remove from source and renumber remaining source chapters
+      const srcRemaining = fs
+        .readdirSync(srcDir)
+        .filter((f) => f.endsWith('.txt') && !f.startsWith('.') && f !== params.filename)
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+
+      // 2. Move file to target with temporary name
+      const tempDestName = `.moving-${Date.now()}-${params.filename}`
+      const tempDestPath = path.join(dstDir, tempDestName)
+      fs.renameSync(srcFile, tempDestPath)
+
+      renumberDirectoryFiles(srcDir, srcRemaining)
+
+      // 3. Insert into target list and renumber target directory
+      const dstExisting = fs
+        .readdirSync(dstDir)
+        .filter((f) => f.endsWith('.txt') && !f.startsWith('.') && f !== tempDestName)
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+
+      const targetIndex = Math.max(0, Math.min(params.targetIndex, dstExisting.length))
+      dstExisting.splice(targetIndex, 0, tempDestName)
+
+      renumberDirectoryFiles(dstDir, dstExisting)
+    }
+
+    const scanned = this.scanManuscript(projectPath)
+    return { success: true, chapters: scanned.chapters }
   }
 
   public saveProjectMeta(projectPath: string, title: string): boolean {

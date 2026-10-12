@@ -6,6 +6,7 @@ import { RightPanel } from './RightPanel'
 import { OnboardingModal } from '../OnboardingModal'
 import { SettingsModal } from '../SettingsModal'
 import { LibraryPreviewModal } from '../LibraryPreviewModal'
+import { ExportFeedbackToast } from '../ExportFeedbackToast'
 import { useConfigStore, applyTheme } from '../../store/configStore'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 
@@ -154,6 +155,7 @@ export const WorkspaceShell: React.FC = () => {
       <LibraryPreviewModal />
       <OnboardingModal />
       <SettingsModal />
+      <ExportFeedbackToast />
     </div>
   )
 }
