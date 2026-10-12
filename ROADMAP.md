@@ -29,7 +29,7 @@
 | **前端界面层** | **React 19 + Tailwind CSS v4** | 现代化并发渲染，Tailwind v4 CSS-first 极速样式引擎；搭配 Lucide Icons 打造沉浸式创作界面。 |
 | **状态管理** | **Zustand 5** | 轻量无模板代码，原生支持数据状态持久化与微应用模块化。 |
 | **纯文本编辑器** | **定制纯文本编辑器核心** | 严格屏蔽 Markdown 渲染标签；支持全角中文缩进排版、字数统计、划词悬浮菜单与一键标准复制。 |
-| **本地检索与存储** | **better-sqlite3 + SQLite FTS5** | 毫秒级中文全文索引，纯本地运行，零额外重型数据库依赖。 |
+| **本地检索与存储** | **node:sqlite (Node 内置) + SQLite FTS5** | 原生 Node.js 24+ 内置 SQLite 模块，支持 FTS5 全文倒排索引与 768 维向量扩展存储，零 C++ 原生重型外挂依赖。 |
 | **Agent 执行引擎** | **Codex-Style 自研轻量任务运行时** | 任务轮次（Task Turn）内存隔离；流式推理与统一 Tool Call 协议。 |
 | **模型协议适配** | **多协议 LLM 适配器 (Multi-Protocol Adapter)** | 原生支持 Chat Completions (`/v1/chat/completions`)、OpenAI Responses (`/v1/responses`) 及 Anthropic Messages (`/v1/messages`) 三大规范；支持动态拉取上游模型列表与手动回退。 |
 | **实时网络搜索** | **内置 AnySearch 客户端（嵌入主进程）** | 专注 AnySearch，主进程原生直连，支持网页搜索与正文提取，作为 Agent 主动工具按需调用。 |
@@ -114,63 +114,63 @@ my-novel-project/
 ## 四、 详细演进里程碑 (Milestones)
 
 ### 阶段 0：基础工程与框架搭建 (M0 - Foundation)
-- [ ] 初始化 `electron-vite` + `React 19` + `TypeScript 5.8+` + `Tailwind CSS v4` 工程骨架。
-- [ ] 封装类型安全的主进程与渲染进程 IPC 通信桥。
-- [ ] 集成持久化配置系统与首开向导（First-launch Provider Onboarding）：
+- [x] 初始化 `electron-vite` + `React 19` + `TypeScript 5.8+` + `Tailwind CSS v4` 工程骨架。
+- [x] 封装类型安全的主进程与渲染进程 IPC 通信桥。
+- [x] 集成持久化配置系统与首开向导（First-launch Provider Onboarding）：
   - 检测无配置时主动弹窗提示用户配置 Provider。
   - 预设主流模板（DeepSeek、SiliconFlow、Anthropic、OpenAI、Ollama、OpenRouter、自定义）。
   - 统一支持三大主流 API 协议：OpenAI Chat Completions、OpenAI Responses、Anthropic Messages。
   - 上游模型动态拉取与自由输入双模态。
   - 单一主力模型驱动架构（主笔与并发 Sub-agent 共享同一模型，零配置冗余）。
-- [ ] 搭建三栏式核心工作区布局框架。
+- [x] 搭建三栏式核心工作区布局框架。
 
 ### 阶段 1：纯文本手稿编辑器与排版系统 (M1 - Pure-Text Editor)
-- [ ] 真实本地文件直通（Direct File System Binding）：
+- [x] 真实本地文件直通（Direct File System Binding）：
   - 编辑器直接读写磁盘 `.txt` 真实手稿，零中间数据库转存，完全透明无负担。
-- [ ] 研发专注纯文本的轻量编辑器组件：
+- [x] 研发专注纯文本的轻量编辑器组件：
   - 严格禁止 Markdown 语法渲染标签（无 `#`、`**`、`>` 污染）。
   - 中文标准排版（段首自动缩进两个全角空格、段落间空行控制）。
   - 中文标点规范化（英文引号、连字符自动映射为规范中文双引号 `“ ”` 和破折号 `——`）。
-- [ ] 「一键发布纯文本复制」工具栏与快捷键。
-- [ ] 编辑器划词交互系统：选中文本弹出快捷操作（扩写、润色、查证）。
+- [x] 「一键发布纯文本复制」工具栏与快捷键。
+- [x] 编辑器划词交互系统：选中文本弹出快捷操作（扩写、润色、查证）。
 - [ ] 专注写作辅助：
   - 打字机定焦模式（Typewriter Scrolling）。
   - 全屏禅模式（Zen Mode）。
-  - 秒级本地增量自动保存。
+  - [x] 秒级本地增量自动保存。
 
 ### 阶段 2：独立资料库与项目解耦 (M2 - Library & Workspace Decoupling)
-- [ ] 落地 `~/.explosion/` 全局环境与独立 `library/` 资料库：
+- [x] 落地 `~/.explosion/` 全局环境与独立 `library/` 资料库：
   - 设立 `~/.explosion/scripts/organize_library.py` 与 `.venv/`；
   - 赋予 Agent 探查大文件、自主修改脚本并物理拆分图书的能力；
   - 支持直接存放大篇幅、整本原著原始 TXT。
-- [ ] 搭建单部小说项目（`my-novel-project/`）结构：
+- [x] 搭建单部小说项目（`my-novel-project/`）结构：
   - `manuscript/`（手稿）、`story/`（人物卡、大纲、剧情推演、动态账本）。
-- [ ] 集成 SQLite FTS5 本地全文索引（在 `~/.explosion/cache/` 中自动维护）。
+- [x] 集成 SQLite FTS5 本地全文索引（基于 `node:sqlite` 在 `~/.explosion/cache/` 中自动维护）。
 
 ### 阶段 3：Codex-Style Agent 运行时与联网搜索 (M3 - Agent & Search Engine)
-- [ ] 构建 Node.js 主进程 Agent 执行引擎：
+- [x] 构建 Node.js 主进程 Agent 执行引擎：
   - 多协议统一适配器，全协议支持流式（SSE）与 Tool Call。
   - 基于 Task Turn 的上下文精准装配（按需注入，执行完即释放，防腐烂）。
-- [ ] 交互控制与成本监控：
+- [x] 交互控制与成本监控：
   - 流式生成随时中断（AbortController 毫秒级打断）与一键热重试。
   - Token 与预估成本透明监控面板。
-- [ ] 嵌入实时搜索能力（Embedded AnySearch Tool）：
+- [x] 嵌入实时搜索能力（Embedded AnySearch Tool）：
   - 主进程原生直连 AnySearch，免 Key 匿名开箱可用，支持 API Key 配置。
   - 作为 Agent 主动调用的原生 Tool，在整理书目或写书查证时按需使用。
 
 ### 阶段 4：Sub-agent 评判与审校工作流 (M4 - Sub-agent Review Matrix)
-- [ ] 实现评审流水线：主笔生成候选段落 -> 触发并发审查。
-- [ ] 落地三大 Sub-agent 审校器：
+- [x] 实现评审流水线：主笔生成候选段落 -> 触发并发审查。
+- [x] 落地三大 Sub-agent 审校器：
   - **Style Critic**：文风拟合度与语言质感评审。
   - **Consistency Inspector**：吃书检测与设定矛盾核对。
   - **De-AI Guard**：黑名单句式拦截与动作化（Show don't tell）改写建议。
 - [ ] 创作辅助与视角守护：
   - 剧情分叉推演（Multi-Roll / 走向抽卡）。
   - POV 叙事视角锁定守护（严防限定视角越界）。
-- [ ] 交互式 Diff 与替换卡片：在右侧面板并列展示评审意见与改写方案，支持一键采纳。
+- [x] 交互式 Diff 与替换卡片：在右侧面板并列展示评审意见与改写方案，支持一键采纳。
 
 ### 阶段 5：进阶创作生态与体验优化 (M5 - Polish & Ecosystem)
 - [ ] 树状大纲系统：卷-章-节树状结构，支持滚动式动态细纲规划。
-- [ ] 本地安全快照与 Git 版本历史：每次章节保存自动生成快照，支持任意历史回滚。
+- [x] 本地安全快照与 Git 版本历史：每次章节保存自动生成快照，支持任意历史回滚。
 - [ ] 导出套件：无损纯文本导出、EPUB 电子书打包、PDF 排版导出。
 - [ ] 性能与体验打磨：多窗口支持、快捷键全键盘操作、暗夜专注模式。
