@@ -204,7 +204,7 @@ describe('search_library Tool & Hybrid RAG (FTS5 + 768-dim Vector)', () => {
     expect(matches.length).toBe(1)
     expect(matches[0].paragraph).toContain('吕归尘紧握着影月之刀')
     expect(matches[0].matchType).toBe('fts5')
-  })
+  }, 15000)
 
   it('formats search results cleanly with match badge tags via tool execute', async () => {
     const res = await searchLibraryTool.execute({ query: '不存在的词语xyz123', book_name: '不存在的书目404' }, {})

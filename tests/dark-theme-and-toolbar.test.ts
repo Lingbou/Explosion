@@ -8,34 +8,28 @@ describe('Dark Theme & Toolbar Layout Guardrails', () => {
     expect(IPC_CHANNELS.WINDOW_MAXIMIZE_CHANGED).toBe('window:maximize-changed')
   })
 
-  it('guarantees EditorCenter subheader buttons cannot wrap or break words across lines', () => {
+  it('guarantees EditorCenter 44px subheader bar is completely removed, title is unified with content, and time machine is in footer', () => {
     const editorFilePath = path.resolve(__dirname, '../src/renderer/src/components/layout/EditorCenter.tsx')
     const content = fs.readFileSync(editorFilePath, 'utf-8')
 
-    // Sub-header bar container must be min-w-0
-    expect(content).toContain('backdrop-blur-xs select-none shrink-0 z-20 min-w-0')
+    // Sub-header bar container must be completely removed
+    expect(content).not.toContain('backdrop-blur-xs select-none shrink-0 z-20 min-w-0')
+    expect(content).not.toContain('规范排版</span>')
+    expect(content).not.toContain('复制纯文本</span>')
 
-    // Left title must have min-w-0 to prevent pushing buttons out
-    expect(content).toContain('flex items-center gap-2 flex-1 min-w-0 mr-2 md:mr-4')
+    // Immersive Title is unified inside editor scroll flow (Notion / Typora style)
+    expect(content).toContain('placeholder="未命名章节"')
+    expect(content).toContain('max-w-4xl mx-auto px-8 md:px-12 pt-10')
 
-    // Status and actions buttons container must be shrink-0
-    expect(content).toContain('flex items-center gap-1.5 shrink-0 overflow-x-auto scrollbar-none')
-
-    // Core buttons must have shrink-0 and whitespace-nowrap to forbid Chinese vertical word wrapping
-    expect(content).toContain('定焦</span>')
-    expect(content).toMatch(/定焦<\/span>[\s\S]*?whitespace-nowrap|whitespace-nowrap[\s\S]*?定焦<\/span>/)
-
-    expect(content).toContain('排版</span>')
-    expect(content).toMatch(/排版<\/span>[\s\S]*?whitespace-nowrap|whitespace-nowrap[\s\S]*?排版<\/span>/)
-
+    // Time Machine button is present in bottom status bar footer
     expect(content).toContain('时光机</span>')
-    expect(content).toMatch(/时光机<\/span>[\s\S]*?whitespace-nowrap|whitespace-nowrap[\s\S]*?时光机<\/span>/)
+    expect(content).toMatch(/<footer[\s\S]*?时光机[\s\S]*?<\/footer>/)
 
-    expect(content).toContain('规范排版</span>')
-    expect(content).toMatch(/规范排版<\/span>[\s\S]*?whitespace-nowrap|whitespace-nowrap[\s\S]*?规范排版<\/span>/)
-
-    expect(content).toContain('交稿导出')
-    expect(content).toMatch(/交稿导出[\s\S]*?whitespace-nowrap|whitespace-nowrap[\s\S]*?交稿导出/)
+    // SettingsModal has Typewriter Focus Mode toggle
+    const settingsFilePath = path.resolve(__dirname, '../src/renderer/src/components/SettingsModal.tsx')
+    const settingsContent = fs.readFileSync(settingsFilePath, 'utf-8')
+    expect(settingsContent).toContain('打字机定焦滚动模式')
+    expect(settingsContent).toContain('typewriterMode')
   })
 
   it('guarantees RightPanel input area has complete dark theme styles with zero white background bleed', () => {

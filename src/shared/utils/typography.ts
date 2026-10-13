@@ -283,3 +283,93 @@ export function countTextStats(text: string): {
     readingMinutes
   }
 }
+
+/**
+ * Ensures every natural paragraph (non-empty line) begins with double full-width space indentation (\u3000\u3000).
+ * Already-indented lines are preserved without duplicate indentation.
+ */
+export function ensureParagraphIndent(text: string): string {
+  if (!text) return ""
+
+  const lines = text.split(/\r?\n/)
+  const formatted = lines.map((line) => {
+    if (!line.trim()) return ""
+    if (line.startsWith("\u3000\u3000")) {
+      return line
+    }
+    const cleaned = line.replace(/^[\s\u3000]+/, "")
+    if (!cleaned) return ""
+    return `\u3000\u3000${cleaned}`
+  })
+
+  return formatted.join("\n")
+}
+
+/**
+ * Ensures the first non-empty paragraph starts with double full-width space indentation (\u3000\u3000).
+ * If already indented, leaves unchanged. Other paragraphs are preserved.
+ */
+export function ensureFirstParagraphIndent(text: string): string {
+  if (!text) return ""
+
+  const lines = text.split(/\r?\n/)
+  let foundFirst = false
+
+  const formatted = lines.map((line) => {
+    if (foundFirst) return line
+    if (!line.trim()) return line
+
+    foundFirst = true
+    if (line.startsWith("\u3000\u3000")) {
+      return line
+    }
+    const cleaned = line.replace(/^[\s\u3000]+/, "")
+    return `\u3000\u3000${cleaned}`
+  })
+
+  return formatted.join("\n")
+}
+
+/**
+ * Formats pasted text for Chinese novel publication:
+ * - Strips all Markdown pollution
+ * - Standardizes Chinese punctuation
+ * - Automatically indents all natural paragraphs with \u3000\u3000
+ * - Does not duplicate indentation if the current cursor position or line already has indentation
+ */
+export function formatPastedText(pastedText: string, prefixBeforeCursor = ""): string {
+  if (!pastedText) return ""
+
+  const clean = stripMarkdownMarks(pastedText)
+  const punctuated = standardizeChinesePunctuation(clean)
+  const lines = punctuated.split(/\r?\n/)
+
+  const isCurrentLineAlreadyIndented =
+    prefixBeforeCursor.endsWith("\u3000\u3000") ||
+    prefixBeforeCursor.startsWith("\u3000\u3000") ||
+    /^[\s\u3000]*\u3000\u3000[\s\u3000]*$/.test(prefixBeforeCursor)
+
+  const resultLines: string[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (!line.trim()) {
+      resultLines.push("")
+      continue
+    }
+
+    if (i === 0 && isCurrentLineAlreadyIndented) {
+      const cleaned = line.replace(/^[\s\u3000]+/, "")
+      resultLines.push(cleaned)
+    } else {
+      if (line.startsWith("\u3000\u3000")) {
+        resultLines.push(line)
+      } else {
+        const cleaned = line.replace(/^[\s\u3000]+/, "")
+        resultLines.push(`\u3000\u3000${cleaned}`)
+      }
+    }
+  }
+
+  return resultLines.join("\n")
+}
