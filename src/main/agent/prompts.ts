@@ -137,6 +137,13 @@ export const STATIC_SYSTEM_PROMPT_PREFIX = `你是由 Explosion 驱动的自主�
    - 严禁典型的 AI 辩证排比与空洞旁白（“不是……而是……”、“不仅是……更是……”、“时间仿佛在这一刻静止”、“嘴角勾起一抹冷笑”等）；
    - 写入手稿前系统会执行毫秒级门禁拦截；必须始终遵守“具象动作化 (Show don't tell) 与自然留白”。
 
+9. 【客观事实考据严谨性与防幻觉铁律 (Fact Grounding & Anti-Hallucination)】：
+   - 当作者提出客观事实考据需求（如查询某作家的作品集、小说分卷名称、出版年代、真实历史官职制度等）时，你必须严格以检索到的确凿事实为回答准则，严禁凭空盲目脑补！
+   - 严禁脑补清单：若网络检索或资料库摘要仅包含概括性事实（如“共 6 卷”），但未列出具体卷名：
+     - 若无需展开，如实汇报检索到的已知事实（例如：“全书共分为 6 卷，原作者为江南”）；
+     - 若需提供详尽清单，主动调用 \`web_extract\` 抓取权威正文词条，或检索本地素材资料库，绝对不可凭空捏造生造不存在的书卷名称（严禁将《苍云古齿》胡编为《苍云神骑》此类严重常识性错误）；
+   - 本地素材资料库优先原则：若作者考据的书籍已经在素材资料库收录（例如资料库已存在《九州·缥缈录》），必须优先调用 \`search_library\` 检索本地原著真实分卷与物理段落！本地资料库是最高置信度的事实基准，杜绝被外网低劣碎片信息误导！
+
 ---
 ### 👑 长篇大作从零孵化与专业执笔 SOP 协议（职业作家级工程化规范）：
 
@@ -199,6 +206,28 @@ export function buildAgentEnvironmentPrompt(params: PromptContextParams): string
   const scriptsDir = path.join(os.homedir(), '.explosion', 'scripts')
   const storyDir = params.projectPath ? path.join(params.projectPath, 'story') : null
 
+  let libraryBooksSummary = '空 (尚未导入参考书籍)'
+  if (fs.existsSync(libraryDir)) {
+    try {
+      const items = fs.readdirSync(libraryDir)
+      const books: string[] = []
+      for (const item of items) {
+        const full = path.join(libraryDir, item)
+        if (fs.statSync(full).isDirectory()) {
+          const subFiles = fs.readdirSync(full).filter((f) => f.endsWith('.txt'))
+          books.push(`《${item}》（已分卷索引，包含 ${subFiles.length} 卷）`)
+        } else if (item.endsWith('.txt')) {
+          books.push(`《${item.replace(/\.txt$/, '')}》`)
+        }
+      }
+      if (books.length > 0) {
+        libraryBooksSummary = books.join('、')
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   return `
 ---
 ### 当前工作区状态：
@@ -206,6 +235,7 @@ export function buildAgentEnvironmentPrompt(params: PromptContextParams): string
 - 当前正在聚焦的章节手稿: ${params.activeChapterFilename || '无'}
 ${params.selectedText ? `- 作者定向选中的目标文段: 「${params.selectedText.trim()}」\n` : ''}- 本作设定目录 (Story Bible): ${storyDir || '无'}
 - 素材资料库目录: ${libraryDir}
+- 素材资料库当前已收录藏书: ${libraryBooksSummary}
 - 自动化脚本目录: ${scriptsDir}`
 }
 
