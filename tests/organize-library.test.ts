@@ -8,19 +8,18 @@ import { DatabaseSync } from 'node:sqlite'
 describe('organize_library.py Book Splitting & Indexing Script', () => {
   let tempSandboxDir: string
   const testBookName = '大荒记'
-  const cacheBookDir = path.join(os.homedir(), '.explosion', 'cache', 'books', testBookName)
+  let cacheBaseDir: string
 
   beforeEach(() => {
     tempSandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'explosion-organize-test-'))
+    cacheBaseDir = path.join(tempSandboxDir, 'cache')
   })
 
   afterEach(() => {
     if (fs.existsSync(tempSandboxDir)) {
       fs.rmSync(tempSandboxDir, { recursive: true, force: true })
     }
-    if (fs.existsSync(cacheBookDir)) {
-      fs.rmSync(cacheBookDir, { recursive: true, force: true })
-    }
+
   })
 
   it('splits multi-volume book into structured book directory with volumes, .cache symlink and removes original large file', () => {
@@ -52,7 +51,7 @@ describe('organize_library.py Book Splitting & Indexing Script', () => {
     const outDir = path.join(tempSandboxDir, 'output')
     fs.mkdirSync(outDir, { recursive: true })
 
-    const output = execSync(`python3 "${scriptPath}" "${bookFile}" --output-dir "${outDir}"`, {
+    const output = execSync(`python3 "${scriptPath}" "${bookFile}" --output-dir "${outDir}" --cache-base-dir "${cacheBaseDir}"`, {
       encoding: 'utf-8'
     })
 
@@ -81,7 +80,7 @@ describe('organize_library.py Book Splitting & Indexing Script', () => {
     expect(fs.existsSync(bookFile)).toBe(false)
 
     // Verify index.db contains both FTS5 table and paragraph_embeddings table
-    const dbPath = path.join(cacheBookDir, 'index.db')
+    const dbPath = path.join(cacheBaseDir, testBookName, 'index.db')
     expect(fs.existsSync(dbPath)).toBe(true)
 
     const db = new DatabaseSync(dbPath)
@@ -115,7 +114,7 @@ describe('organize_library.py Book Splitting & Indexing Script', () => {
     const outDir = path.join(tempSandboxDir, 'out_keep')
     fs.mkdirSync(outDir, { recursive: true })
 
-    execSync(`python3 "${scriptPath}" "${bookFile}" --output-dir "${outDir}" --keep-original --no-embeddings`, {
+    execSync(`python3 "${scriptPath}" "${bookFile}" --output-dir "${outDir}" --keep-original --no-embeddings --cache-base-dir "${cacheBaseDir}"`, {
       encoding: 'utf-8'
     })
 

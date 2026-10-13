@@ -226,10 +226,10 @@ export const SnapshotDrawer: React.FC<SnapshotDrawerProps> = ({
             {selectedSnapshot ? (
               <>
                 {/* Preview Toolbar */}
-                <div className="h-11 px-6 border-b border-stone-100 flex items-center justify-between select-none shrink-0 bg-stone-50/50">
+                <div className="h-11 px-6 border-b border-stone-100 dark:border-stone-800 flex items-center justify-between select-none shrink-0 bg-stone-50/50 dark:bg-[#181716]">
                   <div className="flex items-center gap-2 truncate">
                     <FileText className="w-3.5 h-3.5 text-stone-500" />
-                    <span className="font-semibold text-xs text-stone-800">
+                    <span className="font-semibold text-xs text-stone-800 dark:text-stone-200">
                       快照版本预览
                     </span>
                     <span className="text-[10px] text-stone-400 font-mono">
@@ -266,11 +266,11 @@ export const SnapshotDrawer: React.FC<SnapshotDrawerProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="h-8 px-5 border-t border-stone-200 bg-stone-50 flex items-center justify-between text-[11px] text-stone-400 font-mono select-none shrink-0">
+        <div className="h-8 px-5 border-t border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-[#161514] flex items-center justify-between text-[11px] text-stone-400 dark:text-stone-500 font-mono select-none shrink-0">
           <span>防丢稿保护 · 每次 Agent 改写与重要保存均自动生成不可篡改的本地物理快照</span>
           <button
             onClick={onClose}
-            className="text-stone-500 hover:text-stone-800 transition-colors"
+            className="text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 transition-colors cursor-pointer"
           >
             关闭
           </button>

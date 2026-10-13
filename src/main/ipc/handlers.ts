@@ -421,7 +421,9 @@ export function registerIpcHandlers(): void {
       } else {
         win.maximize()
       }
-      return win.isMaximized()
+      const isMax = win.isMaximized()
+      win.webContents.send(IPC_CHANNELS.WINDOW_MAXIMIZE_CHANGED, isMax)
+      return isMax
     }
     return false
   })

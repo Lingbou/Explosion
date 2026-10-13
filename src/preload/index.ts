@@ -322,6 +322,15 @@ const api: ElectronApi = {
   maximizeWindow: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_MAXIMIZE),
   closeWindow: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_CLOSE),
   isWindowMaximized: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_IS_MAXIMIZED),
+  onWindowMaximizeChanged: (callback: (isMaximized: boolean) => void): (() => void) => {
+    const listener = (_event: IpcRendererEvent, isMaximized: boolean): void => {
+      callback(isMaximized)
+    }
+    ipcRenderer.on(IPC_CHANNELS.WINDOW_MAXIMIZE_CHANGED, listener)
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.WINDOW_MAXIMIZE_CHANGED, listener)
+    }
+  },
 
   // App Utilities
   getAppPaths: (): Promise<AppPaths> => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_PATHS),

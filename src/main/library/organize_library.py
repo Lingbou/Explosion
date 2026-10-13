@@ -284,7 +284,7 @@ def ensure_cache_symlink(book_dir: str, cache_dir: str):
         print(f"建立 .cache 软链接提示: {e}", file=sys.stderr)
 
 
-def split_book_by_volumes(file_path: str, output_dir: Optional[str] = None, remove_original: bool = True, build_embeddings: bool = True) -> List[str]:
+def split_book_by_volumes(file_path: str, output_dir: Optional[str] = None, remove_original: bool = True, build_embeddings: bool = True, cache_base_dir: Optional[str] = None) -> List[str]:
     if not os.path.exists(file_path):
         print(f"错误: 目标文件不存在 -> {file_path}", file=sys.stderr)
         return []
@@ -345,7 +345,8 @@ def split_book_by_volumes(file_path: str, output_dir: Optional[str] = None, remo
 
             created_files.append(file_path_out)
 
-    cache_dir = os.path.expanduser(f"~/.explosion/cache/books/{base_name}")
+    cache_base = cache_base_dir if cache_base_dir else os.path.expanduser("~/.explosion/cache/books")
+    cache_dir = os.path.join(cache_base, base_name)
     db_path = os.path.join(cache_dir, "index.db")
     total_indexed, total_embedded = build_book_index(db_path, created_files, build_embeddings=build_embeddings)
     print(f"构建全文与向量索引完成: 共索引 {total_indexed} 个自然段 (其中向量嵌入 {total_embedded} 个) -> {db_path}")
@@ -364,7 +365,7 @@ def split_book_by_volumes(file_path: str, output_dir: Optional[str] = None, remo
     return created_files
 
 
-def migrate_flat_library_files(library_dir: str, build_embeddings: bool = True):
+def migrate_flat_library_files(library_dir: str, build_embeddings: bool = True, cache_base_dir: Optional[str] = None):
     if not os.path.exists(library_dir):
         return
 
@@ -393,7 +394,8 @@ def migrate_flat_library_files(library_dir: str, build_embeddings: bool = True):
                     pass
 
             if moved_paths:
-                cache_dir = os.path.expanduser(f"~/.explosion/cache/books/{book_name}")
+                cache_base = cache_base_dir if cache_base_dir else os.path.expanduser("~/.explosion/cache/books")
+                cache_dir = os.path.join(cache_base, book_name)
                 db_path = os.path.join(cache_dir, "index.db")
                 build_book_index(db_path, moved_paths, build_embeddings=build_embeddings)
                 ensure_cache_symlink(book_dir, cache_dir)
@@ -431,6 +433,7 @@ def main():
     parser = argparse.ArgumentParser(description="Explosion 资料库物理分卷拆解、FTS5 全文索引与 768 维语义向量索引工具")
     parser.add_argument("target", nargs="?", default=None, help="目标大 TXT 文件路径或资料库目录")
     parser.add_argument("--output-dir", "-o", default=None, help="输出文件夹，默认存放于资料库目录")
+    parser.add_argument("--cache-base-dir", default=None, help="自定义缓存根目录，默认存放于 ~/.explosion/cache/books")
     parser.add_argument("--keep-original", action="store_true", help="拆解完成后保留原始大文件（默认自动清理）")
     parser.add_argument("--migrate", action="store_true", help="整理资料库根目录下的散落分卷")
     parser.add_argument("--no-embeddings", action="store_true", help="跳过 768 维语义向量嵌入，仅建立纯 FTS5 全文索引")
@@ -490,14 +493,14 @@ def main():
             size_mb = os.path.getsize(tf) / (1024 * 1024)
             if size_mb >= 0.5:
                 print(f"\n发现大部头书籍: {os.path.basename(tf)} ({size_mb:.2f} MB)")
-                created = split_book_by_volumes(tf, args.output_dir or target, remove_original=remove_orig, build_embeddings=build_emb)
+                created = split_book_by_volumes(tf, args.output_dir or target, remove_original=remove_orig, build_embeddings=build_emb, cache_base_dir=args.cache_base_dir)
                 if created:
                     print(f"成功物理拆解为 {len(created)} 个单卷文件 (UTF-8 编码):")
                     for c in created:
                         sz = os.path.getsize(c) / 1024
                         print(f"  - {os.path.basename(c)} ({sz:.1f} KB)")
     else:
-        created = split_book_by_volumes(target, args.output_dir, remove_original=remove_orig, build_embeddings=build_emb)
+        created = split_book_by_volumes(target, args.output_dir, remove_original=remove_orig, build_embeddings=build_emb, cache_base_dir=args.cache_base_dir)
         if created:
             print(f"成功物理拆解为 {len(created)} 个单卷文件 (UTF-8 编码):")
             for c in created:
