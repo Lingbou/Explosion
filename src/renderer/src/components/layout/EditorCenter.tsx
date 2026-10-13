@@ -4,8 +4,6 @@ import {
   Check,
   Copy,
   Clock,
-  CheckCircle2,
-  FileEdit,
   FolderOpen,
   FolderPlus,
   PenLine,
@@ -394,23 +392,6 @@ export const EditorCenter: React.FC = () => {
 
         {/* Status & Actions */}
         <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto scrollbar-none">
-          {/* Save Status */}
-          <div className="flex items-center gap-1 text-xs text-stone-400 dark:text-stone-500 mr-0.5 shrink-0 whitespace-nowrap">
-            {isDirty ? (
-              <>
-                <FileEdit className="w-3.5 h-3.5 text-amber-600 dark:text-amber-500 animate-pulse shrink-0" />
-                <span>编辑中</span>
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-500 shrink-0" />
-                <span>已保存</span>
-              </>
-            )}
-          </div>
-
-          <div className="w-[1px] h-3.5 bg-stone-200 dark:bg-stone-800" />
-
           {/* Typewriter Scroll Focus Toggle */}
           <button
             onClick={handleToggleTypewriter}
