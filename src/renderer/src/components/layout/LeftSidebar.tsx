@@ -33,6 +33,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
     projectPath,
     projectTitle,
     setProjectTitle,
+    isDirty,
     chapters,
     volumes,
     selectedVolume,
@@ -405,7 +406,16 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
               className="bg-white dark:bg-[#181716] border border-stone-400 dark:border-stone-600 rounded px-1 text-xs text-stone-900 dark:text-stone-100 w-full focus:outline-none"
             />
           ) : (
-            <span className="truncate">{ch.title || `第 ${index + 1} 章`}</span>
+            <>
+              <span className="truncate">{ch.title || `第 ${index + 1} 章`}</span>
+              {isActive && isDirty && (
+                <span
+                  className="w-2 h-2 rounded-full bg-stone-400 dark:bg-stone-500 opacity-80 shrink-0"
+                  title="未保存更改"
+                  data-testid="dirty-indicator"
+                />
+              )}
+            </>
           )}
         </div>
 
@@ -449,27 +459,27 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
       style={{ width: `${width}px` }}
       className="border-r border-stone-200 dark:border-stone-800 bg-[#f7f7f5] dark:bg-[#181716] flex flex-col justify-between select-none shrink-0 overflow-hidden h-full"
     >
-      {/* Top Header: Column-Integrated Project Switcher Bar */}
-      <div className="h-11 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1f1e1c] px-3 flex items-center justify-between select-none shrink-0 relative z-30">
-        <div ref={projectMenuRef} className="relative flex-1 mr-1">
+      {/* Top Header: Column-Integrated Project Switcher Bar (Compact h-9) */}
+      <div className="h-9 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1f1e1c] px-2 flex items-center justify-between select-none shrink-0 relative z-30">
+        <div ref={projectMenuRef} className="relative flex-1 mr-1 min-w-0">
           <button
             onClick={() => setIsProjectMenuOpen(!isProjectMenuOpen)}
-            className="flex items-center gap-1.5 px-1.5 py-1 rounded-md text-xs font-semibold text-stone-900 dark:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors w-full text-left"
+            className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-medium text-stone-800 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors w-full text-left"
             title="点击切换或管理小说工程"
           >
-            <FolderOpen className="w-3.5 h-3.5 text-stone-500 shrink-0" />
+            <FolderOpen className="w-3 h-3 text-stone-500 dark:text-stone-400 shrink-0" />
             <span className="truncate flex-1">
               {projectPath ? projectTitle || '未命名作品' : '未打开工程'}
             </span>
-            <ChevronDown className="w-3 h-3 text-stone-400 shrink-0" />
+            <ChevronDown className="w-2.5 h-2.5 text-stone-400 shrink-0" />
           </button>
 
           {/* Project Switcher Dropdown Menu */}
           {isProjectMenuOpen && (
             <div
-              className="absolute left-0 mt-1 w-60 bg-white dark:bg-[#22211f] border border-stone-200 dark:border-stone-700 rounded-lg shadow-xl py-1 text-xs z-50 animate-in fade-in duration-100 font-sans"
+              className="absolute left-0 top-full mt-0.5 w-56 bg-white dark:bg-[#22211f] border border-stone-200 dark:border-stone-700 rounded-md shadow-xl py-1 text-xs z-50 animate-in fade-in duration-100 font-sans"
             >
-              <div className="px-3 py-1.5 border-b border-stone-100 dark:border-stone-800 text-[10px] text-stone-400 dark:text-stone-500 truncate font-mono">
+              <div className="px-2.5 py-1 border-b border-stone-100 dark:border-stone-800 text-[10px] text-stone-400 dark:text-stone-500 truncate font-mono">
                 {projectPath ? projectPath : '尚未关联本地小说文件夹'}
               </div>
 
@@ -478,9 +488,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                   setIsProjectMenuOpen(false)
                   createProject()
                 }}
-                className="w-full text-left px-3 py-1.5 hover:bg-stone-50 dark:hover:bg-stone-800 flex items-center gap-2 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
+                className="w-full text-left px-2.5 py-1.5 hover:bg-stone-50 dark:hover:bg-stone-800 flex items-center gap-2 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
               >
-                <FolderPlus className="w-3.5 h-3.5 text-stone-500" />
+                <FolderPlus className="w-3 h-3 text-stone-500" />
                 <span>新建小说工程文件夹...</span>
               </button>
 
@@ -489,9 +499,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                   setIsProjectMenuOpen(false)
                   openProject()
                 }}
-                className="w-full text-left px-3 py-1.5 hover:bg-stone-50 dark:hover:bg-stone-800 flex items-center gap-2 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
+                className="w-full text-left px-2.5 py-1.5 hover:bg-stone-50 dark:hover:bg-stone-800 flex items-center gap-2 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
               >
-                <FolderOpen className="w-3.5 h-3.5 text-stone-500" />
+                <FolderOpen className="w-3 h-3 text-stone-500" />
                 <span>打开已有小说文件夹...</span>
               </button>
 
@@ -505,7 +515,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                         setProjectTitle(newTitle.trim())
                       }
                     }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors border-t border-stone-100 dark:border-stone-800"
+                    className="w-full text-left px-2.5 py-1.5 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors border-t border-stone-100 dark:border-stone-800"
                   >
                     重命名小说名称...
                   </button>
@@ -515,9 +525,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                       exportManuscript()
                     }}
                     disabled={isExporting}
-                    className="w-full text-left px-3 py-1.5 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 transition-colors border-t border-stone-100 dark:border-stone-800 flex items-center gap-2"
+                    className="w-full text-left px-2.5 py-1.5 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 transition-colors border-t border-stone-100 dark:border-stone-800 flex items-center gap-2"
                   >
-                    <Download className="w-3.5 h-3.5 text-stone-500" />
+                    <Download className="w-3 h-3 text-stone-500" />
                     <span>交稿导出全书 (.txt)...</span>
                   </button>
                   <button
@@ -525,9 +535,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                       setIsProjectMenuOpen(false)
                       closeProject()
                     }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 transition-colors border-t border-stone-100 dark:border-stone-800 flex items-center gap-2"
+                    className="w-full text-left px-2.5 py-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 transition-colors border-t border-stone-100 dark:border-stone-800 flex items-center gap-2"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3 h-3" />
                     <span>关闭当前工程</span>
                   </button>
                 </>
@@ -544,17 +554,17 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                 setIsCreatingVolume(true)
                 setNewVolumeNameInput(`第${allVolumeNames.length + 1}卷`)
               }}
-              className="p-1 rounded text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+              className="p-1 rounded text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
               title="新建分卷"
             >
-              <FolderPlus className="w-3.5 h-3.5" />
+              <FolderPlus className="w-3 h-3" />
             </button>
             <button
               onClick={() => addChapter()}
-              className="p-1 rounded text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+              className="p-1 rounded text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
               title="新建章节（落在当前选中的卷）"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-3 h-3" />
             </button>
           </div>
         )}
@@ -973,7 +983,16 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                                     className="bg-white dark:bg-[#181716] border border-stone-400 dark:border-stone-600 rounded px-1 text-xs text-stone-900 dark:text-stone-100 w-full focus:outline-none"
                                   />
                                 ) : (
-                                  <span className="truncate text-[11px]">{outline.title}</span>
+                                  <>
+                                    <span className="truncate text-[11px]">{outline.title}</span>
+                                    {isActive && isDirty && (
+                                      <span
+                                        className="w-2 h-2 rounded-full bg-stone-400 dark:bg-stone-500 opacity-80 shrink-0"
+                                        title="未保存更改"
+                                        data-testid="dirty-indicator"
+                                      />
+                                    )}
+                                  </>
                                 )}
                               </div>
 
@@ -1077,7 +1096,16 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                                     className="bg-white dark:bg-[#181716] border border-stone-400 dark:border-stone-600 rounded px-1 text-xs text-stone-900 dark:text-stone-100 w-full focus:outline-none"
                                   />
                                 ) : (
-                                  <span className="truncate text-[11px]">{char.title}</span>
+                                  <>
+                                    <span className="truncate text-[11px]">{char.title}</span>
+                                    {isActive && isDirty && (
+                                      <span
+                                        className="w-2 h-2 rounded-full bg-stone-400 dark:bg-stone-500 opacity-80 shrink-0"
+                                        title="未保存更改"
+                                        data-testid="dirty-indicator"
+                                      />
+                                    )}
+                                  </>
                                 )}
                               </div>
 
@@ -1113,22 +1141,33 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ width }) => {
                 </div>
 
                 {/* 3. Threads (暗线) */}
-                {storyBible?.ledger && (
-                  <div
-                    onClick={() => selectStoryFile(storyBible.ledger!)}
-                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
-                      activeDocumentType === 'story' &&
-                      activeStoryFile?.relativePath === storyBible.ledger.relativePath
-                        ? 'bg-white dark:bg-[#252321] text-stone-900 dark:text-stone-100 font-medium shadow-2xs border border-stone-200/60 dark:border-stone-700'
-                        : 'text-stone-600 dark:text-stone-400 hover:bg-stone-200/50 dark:hover:bg-stone-800/60 hover:text-stone-900 dark:hover:text-stone-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 truncate">
-                      <Bookmark className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
-                      <span className="font-medium text-xs text-stone-800 dark:text-stone-200">暗线</span>
+                {storyBible?.ledger && (() => {
+                  const isActive =
+                    activeDocumentType === 'story' &&
+                    activeStoryFile?.relativePath === storyBible.ledger.relativePath
+                  return (
+                    <div
+                      onClick={() => selectStoryFile(storyBible.ledger!)}
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
+                        isActive
+                          ? 'bg-white dark:bg-[#252321] text-stone-900 dark:text-stone-100 font-medium shadow-2xs border border-stone-200/60 dark:border-stone-700'
+                          : 'text-stone-600 dark:text-stone-400 hover:bg-stone-200/50 dark:hover:bg-stone-800/60 hover:text-stone-900 dark:hover:text-stone-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 truncate flex-1 mr-1">
+                        <Bookmark className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                        <span className="font-medium text-xs text-stone-800 dark:text-stone-200">暗线</span>
+                        {isActive && isDirty && (
+                          <span
+                            className="w-2 h-2 rounded-full bg-stone-400 dark:bg-stone-500 opacity-80 shrink-0"
+                            title="未保存更改"
+                            data-testid="dirty-indicator"
+                          />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
               </div>
             )}
           </div>
