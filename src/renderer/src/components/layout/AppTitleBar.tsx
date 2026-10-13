@@ -12,6 +12,12 @@ export const AppTitleBar: React.FC = () => {
     if (window.api?.isWindowMaximized) {
       window.api.isWindowMaximized().then(setIsMaximized).catch(() => {})
     }
+    const unsubscribe = window.api?.onWindowMaximizeChanged?.((maximized) => {
+      setIsMaximized(maximized)
+    })
+    return () => {
+      unsubscribe?.()
+    }
   }, [])
 
   const handleMinimize = () => {
@@ -90,7 +96,10 @@ export const AppTitleBar: React.FC = () => {
             title={isMaximized ? '还原' : '最大化'}
           >
             {isMaximized ? (
-              <Copy className="w-3 h-3 stroke-[1.75]" />
+              <svg className="w-3 h-3 text-stone-500 dark:text-stone-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="4.5" y="1.5" width="9.5" height="9.5" rx="1" />
+                <path d="M2 4.5v9a1 1 0 001 1h9" strokeLinecap="round" />
+              </svg>
             ) : (
               <Square className="w-3 h-3 stroke-[1.75]" />
             )}

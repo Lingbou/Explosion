@@ -262,6 +262,7 @@ export const IPC_CHANNELS = {
   WINDOW_MAXIMIZE: 'window:maximize',
   WINDOW_CLOSE: 'window:close',
   WINDOW_IS_MAXIMIZED: 'window:is-maximized',
+  WINDOW_MAXIMIZE_CHANGED: 'window:maximize-changed',
 
 
 
@@ -393,6 +394,7 @@ export interface ElectronApi {
   maximizeWindow: () => Promise<boolean>
   closeWindow: () => Promise<boolean>
   isWindowMaximized: () => Promise<boolean>
+  onWindowMaximizeChanged?: (callback: (isMaximized: boolean) => void) => () => void
 
   // App Utilities
   getAppPaths: () => Promise<AppPaths>

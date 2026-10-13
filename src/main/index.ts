@@ -3,6 +3,7 @@ import { join } from 'path'
 import * as fs from 'fs'
 import { globalConfigStore } from './config/store'
 import { registerIpcHandlers } from './ipc/handlers'
+import { IPC_CHANNELS } from '../shared/types/ipc'
 
 // Linux desktop stability: disable hardware acceleration if needed or add fallback flags
 if (process.platform === 'linux') {
@@ -63,6 +64,14 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
+  })
+
+  mainWindow.on('maximize', () => {
+    mainWindow?.webContents.send(IPC_CHANNELS.WINDOW_MAXIMIZE_CHANGED, true)
+  })
+
+  mainWindow.on('unmaximize', () => {
+    mainWindow?.webContents.send(IPC_CHANNELS.WINDOW_MAXIMIZE_CHANGED, false)
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

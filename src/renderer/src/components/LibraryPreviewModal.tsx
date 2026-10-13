@@ -336,9 +336,9 @@ export const LibraryPreviewModal: React.FC = () => {
             {previewBook ? (
               <>
                 {/* Viewer Top Subheader */}
-                <div className="h-10 px-6 border-b border-stone-100 flex items-center justify-between select-none shrink-0 bg-stone-50/40">
+                <div className="h-10 px-6 border-b border-stone-100 dark:border-stone-800 flex items-center justify-between select-none shrink-0 bg-stone-50/40 dark:bg-[#181716]">
                   <div className="flex items-center gap-2 truncate">
-                    <span className="font-semibold text-xs text-stone-800 truncate">
+                    <span className="font-semibold text-xs text-stone-800 dark:text-stone-200 truncate">
                       {previewBook.filename}
                     </span>
                     {stats && (
@@ -357,7 +357,7 @@ export const LibraryPreviewModal: React.FC = () => {
 
                   <button
                     onClick={handleCopy}
-                    className="flex items-center gap-1 px-2 py-0.8 text-xs text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded transition-colors"
+                    className="flex items-center gap-1 px-2 py-0.8 text-xs text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 rounded transition-colors cursor-pointer"
                   >
                     {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-stone-500" />}
                     <span>{copied ? '已复制' : '复制全文'}</span>
@@ -368,7 +368,7 @@ export const LibraryPreviewModal: React.FC = () => {
                 <div className="flex-1 overflow-y-auto px-10 py-8 select-text scrollbar-thin bg-white dark:bg-[#141413]">
                   <div className="max-w-3xl mx-auto">
                     {isTruncated && (
-                      <div className="mb-4 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] flex items-center gap-2">
+                      <div className="mb-4 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-200 text-[11px] flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
                         <span>
                           超长文献已自动截断前 30,000 字供阅读预览。完整全文（共 {stats?.chineseChars} 汉字）已建立 FTS5 索引供 Agent 后台毫秒级检索。
@@ -376,7 +376,7 @@ export const LibraryPreviewModal: React.FC = () => {
                       </div>
                     )}
 
-                    <pre className="whitespace-pre-wrap font-serif text-sm leading-[2.1] text-stone-900 tracking-wide font-normal">
+                    <pre className="whitespace-pre-wrap font-serif text-sm leading-[2.1] text-stone-900 dark:text-stone-100 tracking-wide font-normal">
                       {displayContent}
                     </pre>
                   </div>
@@ -392,7 +392,7 @@ export const LibraryPreviewModal: React.FC = () => {
         </div>
 
         {/* Modal Footer */}
-        <div className="h-9 px-5 border-t border-stone-200 bg-stone-50 flex items-center justify-end text-[11px] select-none shrink-0">
+        <div className="h-9 px-5 border-t border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-[#161514] flex items-center justify-end text-[11px] select-none shrink-0">
           <button
             onClick={closeLibraryModal}
             className="px-3.5 py-1 text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 bg-white dark:bg-[#252321] border border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-md transition-colors shadow-2xs cursor-pointer"

@@ -72,79 +72,79 @@ function getToolMeta(toolName: string) {
     case 'search_library':
       return {
         label: '资料库 Hybrid RAG 检索',
-        color: 'text-amber-800 bg-amber-50 border-amber-200',
+        color: 'text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60',
         icon: Search
       }
     case 'exec_command':
       return {
         label: '执行终端命令',
-        color: 'text-purple-600 bg-purple-50 border-purple-200',
+        color: 'text-purple-600 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800/60',
         icon: Terminal
       }
     case 'web_search':
       return {
         label: 'AnySearch 联网搜索',
-        color: 'text-blue-600 bg-blue-50 border-blue-200',
+        color: 'text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60',
         icon: Globe
       }
     case 'web_extract':
       return {
         label: '页面正文抓取',
-        color: 'text-cyan-600 bg-cyan-50 border-cyan-200',
+        color: 'text-cyan-600 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/40 border-cyan-200 dark:border-cyan-800/60',
         icon: Search
       }
     case 'write_file':
       return {
         label: '直接改写手稿/文件',
-        color: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+        color: 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60',
         icon: FilePenLine
       }
     case 'edit_file':
       return {
         label: '局部精准替换',
-        color: 'text-teal-700 bg-teal-50 border-teal-200',
+        color: 'text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800/60',
         icon: FilePenLine
       }
     case 'read_file':
       return {
         label: '读取磁盘文件',
-        color: 'text-amber-700 bg-amber-50 border-amber-200',
+        color: 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60',
         icon: BookOpen
       }
     case 'list_dir':
       return {
         label: '检索目录结构',
-        color: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+        color: 'text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/60',
         icon: FolderTree
       }
     case 'spawn_subagent':
       return {
         label: '派生 Sub-agent 子任务',
-        color: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+        color: 'text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/60',
         icon: Cpu
       }
     case 'await_subagent':
       return {
         label: '等待 Sub-agent 完成',
-        color: 'text-violet-600 bg-violet-50 border-violet-200',
+        color: 'text-violet-600 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800/60',
         icon: Loader2
       }
     case 'terminate_subagent':
       return {
         label: '终止 Sub-agent 子任务',
-        color: 'text-rose-600 bg-rose-50 border-rose-200',
+        color: 'text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/60',
         icon: Square
       }
     case 'list_subagents':
       return {
         label: '查看 Sub-agent 列表',
-        color: 'text-indigo-500 bg-indigo-50 border-indigo-200',
+        color: 'text-indigo-500 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/60',
         icon: FolderTree
       }
     default:
       return {
         label: '读取与操作文件',
-        color: 'text-stone-600 bg-stone-50 border-stone-200',
+        color: 'text-stone-600 dark:text-stone-300 bg-stone-50 dark:bg-stone-800/60 border-stone-200 dark:border-stone-800',
         icon: FileText
       }
   }
@@ -193,13 +193,13 @@ const TraceCard: React.FC<{ trace: AgentTraceStep }> = ({ trace }) => {
     <div className="border border-stone-200 dark:border-stone-800 rounded-lg overflow-hidden bg-white dark:bg-[#1f1e1c] shadow-2xs text-[11px] font-sans">
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="px-2.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-stone-50 transition-colors select-none"
+        className="px-2.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-stone-50 dark:hover:bg-[#242321] transition-colors select-none"
       >
         <div className="flex items-center gap-1.5 min-w-0">
           <span className={`p-1 rounded border ${meta.color} shrink-0`}>
             <Icon className="w-3 h-3" />
           </span>
-          <span className="font-semibold text-stone-800 shrink-0">{meta.label}</span>
+          <span className="font-semibold text-stone-800 dark:text-stone-200 shrink-0">{meta.label}</span>
           <span className="text-stone-400 font-mono text-[10px] truncate max-w-[160px]">
             {formatTraceArgs(trace.toolName, trace.args)}
           </span>
@@ -235,7 +235,7 @@ const TraceCard: React.FC<{ trace: AgentTraceStep }> = ({ trace }) => {
       </div>
 
       {isOpen && (
-        <div className="border-t border-stone-100 bg-stone-50/70 p-2 space-y-1.5 text-[10px] font-mono">
+        <div className="border-t border-stone-100 dark:border-stone-800 bg-stone-50/70 dark:bg-[#161514] p-2 space-y-1.5 text-[10px] font-mono">
           <div>
             <span className="text-stone-400 block mb-0.5">参数输入 (Args):</span>
             <pre className="p-1.5 rounded bg-white dark:bg-[#141413] border border-stone-200 dark:border-stone-800 overflow-x-auto whitespace-pre-wrap text-stone-800 dark:text-stone-200 max-h-32">
@@ -265,7 +265,7 @@ export const SubAgentTaskCard: React.FC<{ subagent: SubAgentTaskInfo }> = ({ sub
     <div className="border border-stone-200 dark:border-stone-800 rounded-lg overflow-hidden bg-white dark:bg-[#1f1e1c] shadow-2xs text-[11px] font-sans">
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="px-2.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-stone-50 transition-colors select-none"
+        className="px-2.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-stone-50 dark:hover:bg-[#242321] transition-colors select-none"
       >
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="p-1 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 shrink-0">
@@ -275,7 +275,7 @@ export const SubAgentTaskCard: React.FC<{ subagent: SubAgentTaskInfo }> = ({ sub
               <Cpu className="w-3 h-3 text-indigo-700" />
             )}
           </span>
-          <span className="font-semibold text-stone-800 shrink-0">⚙️ 子任务:</span>
+          <span className="font-semibold text-stone-800 dark:text-stone-200 shrink-0">⚙️ 子任务:</span>
           <span className="text-stone-700 font-medium truncate max-w-[170px]" title={subagent.name}>
             {subagent.name}
           </span>
@@ -313,7 +313,7 @@ export const SubAgentTaskCard: React.FC<{ subagent: SubAgentTaskInfo }> = ({ sub
       </div>
 
       {isOpen && (
-        <div className="border-t border-stone-100 bg-stone-50/70 p-2 space-y-2 text-[10px]">
+        <div className="border-t border-stone-100 dark:border-stone-800 bg-stone-50/70 dark:bg-[#161514] p-2 space-y-2 text-[10px]">
           <div>
             <span className="text-stone-400 block mb-0.5">任务指令:</span>
             <div className="p-1.5 rounded bg-white dark:bg-[#141413] border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 whitespace-pre-wrap leading-relaxed font-sans max-h-28 overflow-y-auto">
@@ -615,7 +615,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
                       className={`group flex items-center justify-between px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${
                         isActive
                           ? 'bg-stone-100 text-stone-900 font-medium'
-                          : 'text-stone-600 hover:bg-stone-50 hover:text-stone-900'
+                          : 'text-stone-600 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800/60 hover:text-stone-900 dark:hover:text-stone-200'
                       }`}
                     >
                       <div className="flex items-center gap-2 truncate flex-1 mr-1">
@@ -663,7 +663,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
           {/* Active Model Pill (Full model name, zero premature truncation) */}
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono border border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100 hover:border-stone-300 transition-all shrink-0 whitespace-nowrap"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono border border-stone-200 dark:border-stone-750 bg-stone-50 dark:bg-[#201f1d] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-[#272624] hover:border-stone-300 dark:hover:border-stone-700 transition-all shrink-0 whitespace-nowrap cursor-pointer"
             title="点击配置主力模型与服务商"
           >
             <span
@@ -724,7 +724,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
               <div className="space-y-2">
                 {/* Thinking Fold */}
                 {msg.thinking && (
-                  <div className="border border-stone-200 rounded-md bg-stone-50/50 overflow-hidden text-[11px]">
+                  <div className="border border-stone-200 dark:border-stone-800 rounded-md bg-stone-50/50 dark:bg-[#1a1918] overflow-hidden text-[11px]">
                     <button
                       onClick={() =>
                         setShowThinkingMap((prev) => ({ ...prev, [msg.id]: !prev[msg.id] }))
@@ -783,7 +783,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
 
             {/* Live Thinking */}
             {currentThinking && (
-              <div className="border border-stone-200 rounded-md bg-stone-50/70 p-2 font-mono text-[10px] text-stone-600 whitespace-pre-wrap max-h-36 overflow-y-auto">
+              <div className="border border-stone-200 dark:border-stone-800 rounded-md bg-stone-50/70 dark:bg-[#1a1918] p-2 font-mono text-[10px] text-stone-600 dark:text-stone-400 whitespace-pre-wrap max-h-36 overflow-y-auto">
                 <span className="text-stone-400 block mb-1">思考中:</span>
                 {currentThinking}
               </div>
@@ -809,9 +809,9 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
 
             {/* Live Delta */}
             {currentDelta && (
-              <div className="p-3 rounded-lg border border-stone-200 bg-stone-50 text-stone-900 font-serif leading-relaxed whitespace-pre-wrap">
+              <div className="p-3 rounded-lg border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-[#1e1d1b] text-stone-900 dark:text-stone-100 font-serif leading-relaxed whitespace-pre-wrap">
                 {stripMarkdownMarks(currentDelta)}
-                <span className="inline-block w-1.5 h-3 ml-1 bg-stone-700 animate-pulse" />
+                <span className="inline-block w-1.5 h-3 ml-1 bg-stone-700 dark:bg-stone-300 animate-pulse" />
               </div>
             )}
           </div>
@@ -824,21 +824,21 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
       <div className="p-3 border-t border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1a1918] shrink-0 relative">
         {/* Selection Reference Capsule */}
         {selectedText && (
-          <div className="mb-2 flex items-center justify-between gap-2 px-2.5 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 shadow-2xs animate-in fade-in slide-in-from-bottom-1 duration-150">
+          <div className="mb-2 flex items-center justify-between gap-2 px-2.5 py-1.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-lg text-xs text-amber-900 dark:text-amber-200 shadow-2xs animate-in fade-in slide-in-from-bottom-1 duration-150">
             <div className="flex items-center gap-1.5 min-w-0 flex-1">
               <span className="shrink-0 text-xs">🎯</span>
-              <span className="font-medium shrink-0 text-[11px] text-amber-800">针对选中文段:</span>
-              <span className="truncate font-serif text-[11px] text-amber-950/80 italic">
+              <span className="font-medium shrink-0 text-[11px] text-amber-800 dark:text-amber-300">针对选中文段:</span>
+              <span className="truncate font-serif text-[11px] text-amber-950/80 dark:text-amber-100/90 italic">
                 "{formatSelectionSnippet(selectedText, 25)}"
               </span>
-              <span className="shrink-0 text-[10px] text-amber-700 font-mono">
+              <span className="shrink-0 text-[10px] text-amber-700 dark:text-amber-400 font-mono">
                 ({selectedText.length} 字)
               </span>
             </div>
             <button
               type="button"
               onClick={clearSelection}
-              className="p-0.5 rounded hover:bg-amber-200/60 text-amber-600 hover:text-amber-950 transition-colors shrink-0 cursor-pointer"
+              className="p-0.5 rounded hover:bg-amber-200/60 dark:hover:bg-amber-800/60 text-amber-600 dark:text-amber-400 hover:text-amber-950 dark:hover:text-amber-100 transition-colors shrink-0 cursor-pointer"
               title="取消针对该文段的定向改写"
             >
               <X className="w-3.5 h-3.5" />
@@ -861,7 +861,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
                     key={cand.id}
                     onClick={() => insertMention(cand.insertText)}
                     className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${
-                      isSelected ? 'bg-stone-100 text-stone-900 font-medium' : 'text-stone-600 hover:bg-stone-50'
+                      isSelected ? 'bg-stone-100 text-stone-900 font-medium' : 'text-stone-600 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800/60 hover:text-stone-900 dark:hover:text-stone-200'
                     }`}
                   >
                     <BookOpen className="w-3.5 h-3.5 text-amber-600 shrink-0" />
@@ -873,7 +873,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
           </div>
         )}
 
-        <div className="relative flex items-end bg-stone-50 border border-stone-200 rounded-lg p-1.5 focus-within:border-stone-400 dark:focus-within:border-stone-600 focus-within:bg-white dark:focus-within:bg-[#161514] transition-all">
+        <div className="relative flex items-end bg-stone-50 dark:bg-[#1e1d1b] border border-stone-200 dark:border-stone-800 rounded-lg p-1.5 focus-within:border-stone-400 dark:focus-within:border-stone-600 focus-within:bg-white dark:focus-within:bg-[#141413] transition-all">
           <textarea
             ref={textareaRef}
             value={inputPrompt}
@@ -889,7 +889,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
               <button
                 type="button"
                 onClick={abortTask}
-                className="p-1.5 rounded-md bg-stone-200 text-stone-700 hover:bg-stone-300 transition-colors"
+                className="p-1.5 rounded-md bg-stone-200 dark:bg-stone-700 text-stone-700 dark:text-stone-200 hover:bg-stone-300 dark:hover:bg-stone-600 transition-colors cursor-pointer"
                 title="终止"
               >
                 <Square className="w-3 h-3 fill-current" />
@@ -899,7 +899,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ width }) => {
                 type="button"
                 onClick={handleSend}
                 disabled={!inputPrompt.trim()}
-                className="p-1.5 rounded-md bg-stone-900 text-white hover:bg-stone-800 transition-colors disabled:opacity-30"
+                className="p-1.5 rounded-md bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-white transition-colors disabled:opacity-30 dark:disabled:opacity-30 cursor-pointer"
                 title="发送"
               >
                 <Send className="w-3 h-3" />

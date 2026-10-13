@@ -202,8 +202,8 @@ export const OnboardingModal: React.FC = () => {
                   onClick={() => handlePresetSelect(preset.id)}
                   className={`p-2.5 rounded-lg border text-left transition-all ${
                     presetId === preset.id
-                      ? 'border-stone-800 bg-stone-50 text-stone-900 shadow-2xs font-medium'
-                      : 'border-stone-200 hover:border-stone-300 text-stone-600'
+                      ? 'border-stone-800 dark:border-stone-300 bg-stone-50 dark:bg-[#252422] text-stone-900 dark:text-stone-100 shadow-2xs font-medium'
+                      : 'border-stone-200 dark:border-stone-750 hover:border-stone-300 dark:hover:border-stone-600 text-stone-600 dark:text-stone-400'
                   }`}
                 >
                   <div className="font-semibold text-xs">{preset.name}</div>
@@ -329,14 +329,14 @@ export const OnboardingModal: React.FC = () => {
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 px-6 border-t border-stone-200 bg-stone-50/50 flex items-center justify-between">
+        <div className="p-4 px-6 border-t border-stone-200 dark:border-stone-800 bg-stone-50/50 dark:bg-[#161514] flex items-center justify-between">
           <button
             type="button"
             onClick={handleTestConnection}
             disabled={isTesting || !baseUrl}
             className="px-3 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#242220] text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100 transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
           >
-            <Zap className="w-3.5 h-3.5 text-stone-600" />
+            <Zap className="w-3.5 h-3.5 text-stone-600 dark:text-stone-400" />
             {isTesting ? '正在测试...' : '测试连通性'}
           </button>
 

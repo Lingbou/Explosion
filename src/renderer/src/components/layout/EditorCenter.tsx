@@ -356,8 +356,8 @@ export const EditorCenter: React.FC = () => {
   return (
     <main className="flex-1 flex flex-col bg-[#fbfbfa] dark:bg-[#141413] relative overflow-hidden">
       {/* Editor Sub-header Bar */}
-      <div className="h-11 border-b border-stone-200/80 dark:border-stone-800 px-6 flex items-center justify-between bg-white/70 dark:bg-[#1a1918]/80 backdrop-blur-xs select-none shrink-0 z-20">
-        <div className="flex items-center gap-2.5 flex-1 mr-4">
+      <div className="h-11 border-b border-stone-200/80 dark:border-stone-800 px-4 md:px-6 flex items-center justify-between bg-white/70 dark:bg-[#1a1918]/80 backdrop-blur-xs select-none shrink-0 z-20 min-w-0">
+        <div className="flex items-center gap-2 flex-1 min-w-0 mr-2 md:mr-4">
           {/* Document Type Badge */}
           {isStoryDoc ? (
             <span className="flex items-center gap-1 text-[11px] font-medium text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 px-2 py-0.5 rounded border border-stone-200 dark:border-stone-700 shrink-0">
@@ -387,23 +387,23 @@ export const EditorCenter: React.FC = () => {
               value={currentTitle}
               onChange={(e) => activeChapter && updateChapterTitle(activeChapter.id, e.target.value)}
               placeholder="章节标题..."
-              className="bg-transparent font-semibold text-sm text-stone-900 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-600 focus:outline-none px-1.5 py-0.5 rounded transition-colors w-full max-w-sm"
+              className="bg-transparent font-semibold text-sm text-stone-900 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-600 focus:outline-none px-1.5 py-0.5 rounded transition-colors w-full min-w-0 max-w-sm truncate"
             />
           )}
         </div>
 
         {/* Status & Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto scrollbar-none">
           {/* Save Status */}
-          <div className="flex items-center gap-1 text-xs text-stone-400 dark:text-stone-500 mr-1">
+          <div className="flex items-center gap-1 text-xs text-stone-400 dark:text-stone-500 mr-0.5 shrink-0 whitespace-nowrap">
             {isDirty ? (
               <>
-                <FileEdit className="w-3.5 h-3.5 text-amber-600 dark:text-amber-500 animate-pulse" />
+                <FileEdit className="w-3.5 h-3.5 text-amber-600 dark:text-amber-500 animate-pulse shrink-0" />
                 <span>编辑中</span>
               </>
             ) : (
               <>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-500" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-500 shrink-0" />
                 <span>已保存</span>
               </>
             )}
@@ -414,29 +414,29 @@ export const EditorCenter: React.FC = () => {
           {/* Typewriter Scroll Focus Toggle */}
           <button
             onClick={handleToggleTypewriter}
-            className={`flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-all cursor-pointer ${
+            className={`flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               typewriterMode
                 ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-300/70 dark:border-amber-700/70 font-medium'
                 : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800'
             }`}
             title={typewriterMode ? '打字机定焦模式 (已开启：光标所在行保持居中)' : '打字机定焦模式 (已关闭)'}
           >
-            <Target className={`w-3.5 h-3.5 ${typewriterMode ? 'text-amber-600 dark:text-amber-400' : 'text-stone-500 dark:text-stone-400'}`} />
+            <Target className={`w-3.5 h-3.5 shrink-0 ${typewriterMode ? 'text-amber-600 dark:text-amber-400' : 'text-stone-500 dark:text-stone-400'}`} />
             <span>定焦</span>
           </button>
 
           {/* Typography Display Settings (Font Size & Line Height Popover) */}
-          <div className="relative" ref={displaySettingsRef}>
+          <div className="relative shrink-0" ref={displaySettingsRef}>
             <button
               onClick={() => setIsDisplaySettingsOpen(!isDisplaySettingsOpen)}
-              className={`flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-all cursor-pointer ${
+              className={`flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-all cursor-pointer shrink-0 whitespace-nowrap ${
                 isDisplaySettingsOpen
                   ? 'bg-stone-200 dark:bg-stone-800 text-stone-900 dark:text-stone-100 font-medium'
                   : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800'
               }`}
               title="调整手稿字号与行距"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400" />
+              <SlidersHorizontal className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 shrink-0" />
               <span>排版</span>
             </button>
 
@@ -464,7 +464,7 @@ export const EditorCenter: React.FC = () => {
                       {fontSize}px
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto scrollbar-none">
                     <button
                       onClick={() => handleAdjustFontSize(-1)}
                       disabled={fontSize <= MIN_FONT_SIZE}
@@ -499,7 +499,7 @@ export const EditorCenter: React.FC = () => {
                       {lineHeight.toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto scrollbar-none">
                     <button
                       onClick={() => handleAdjustLineHeight(-0.05)}
                       disabled={lineHeight <= MIN_LINE_HEIGHT}
@@ -532,13 +532,13 @@ export const EditorCenter: React.FC = () => {
           {/* Theme Quick Toggle (Sun / Moon) */}
           <button
             onClick={handleToggleTheme}
-            className="flex items-center justify-center p-1.5 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-md transition-colors cursor-pointer"
+            className="flex items-center justify-center p-1.5 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-md transition-colors cursor-pointer shrink-0"
             title={theme === 'dark' ? '切换为明亮模式' : '切换为夜间模式'}
           >
             {theme === 'dark' ? (
-              <Sun className="w-3.5 h-3.5 text-amber-400" />
+              <Sun className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             ) : (
-              <Moon className="w-3.5 h-3.5 text-stone-600" />
+              <Moon className="w-3.5 h-3.5 text-stone-600 dark:text-stone-400 shrink-0" />
             )}
           </button>
 
@@ -547,26 +547,26 @@ export const EditorCenter: React.FC = () => {
           {/* Time Machine Button */}
           <button
             onClick={() => setIsSnapshotOpen(true)}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-md transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 text-xs text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-md transition-colors cursor-pointer shrink-0 whitespace-nowrap"
             title="查看与回滚历史修改版本（本地时光机防丢稿）"
           >
-            <History className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400" />
+            <History className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 shrink-0" />
             <span>时光机</span>
           </button>
 
           {/* Quick Format & Copy */}
           <button
             onClick={applyTypography}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-md transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 text-xs text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-md transition-colors cursor-pointer shrink-0 whitespace-nowrap"
             title="应用中文出版排版规范（全角双空格缩进、标点统一）"
           >
-            <AlignLeft className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400" />
+            <AlignLeft className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 shrink-0" />
             <span>规范排版</span>
           </button>
 
           <button
             onClick={handleCopyCleanText}
-            className={`flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-all cursor-pointer ${
+            className={`flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               copied
                 ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
                 : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800'
@@ -574,21 +574,21 @@ export const EditorCenter: React.FC = () => {
             title="复制无 Markdown 污染的出版级纯文本"
           >
             {copied ? (
-              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
             ) : (
-              <Copy className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400" />
+              <Copy className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 shrink-0" />
             )}
             <span>{copied ? '已复制' : '复制纯文本'}</span>
           </button>
-          <div className="w-[1px] h-3.5 bg-stone-200" />
+          <div className="w-[1px] h-3.5 bg-stone-200 dark:bg-stone-800 shrink-0" />
 
           <button
             onClick={() => exportManuscript()}
             disabled={isExporting}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-md transition-colors disabled:opacity-50"
+            className="flex items-center gap-1 px-2 py-1 text-xs text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-md transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap cursor-pointer"
             title="交稿导出：按章节顺序合并全书并导出为出版级规范纯文本 (.txt)"
           >
-            <Download className="w-3.5 h-3.5 text-stone-500" />
+            <Download className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400 shrink-0" />
             <span>{isExporting ? "导出中..." : "交稿导出"}</span>
           </button>
         </div>
