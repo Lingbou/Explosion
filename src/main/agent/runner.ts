@@ -281,7 +281,9 @@ export class AgentRunner {
           tool_calls: toolCalls
         })
 
-        // Execute each tool sequentially
+        // Execute each tool sequentially with turn-level deduplication
+        const executedToolsCache = new Map<string, { result: string; error?: string; durationMs: number }>()
+
         for (const tc of toolCalls) {
           if (signal.aborted) {
             onEvent({
@@ -298,6 +300,18 @@ export class AgentRunner {
             tc.name,
             tc.arguments
           )
+
+          // Deduplicate identical tool calls within the exact same turn
+          const dedupKey = `${resolvedName}:${JSON.stringify(resolvedArgs)}`
+          if (executedToolsCache.has(dedupKey)) {
+            const cached = executedToolsCache.get(dedupKey)!
+            messages.push({
+              role: 'tool',
+              tool_call_id: tc.id,
+              content: cached.result
+            })
+            continue
+          }
 
           onEvent({
             taskId,
@@ -342,6 +356,7 @@ export class AgentRunner {
           }
 
           const durationMs = Math.round(performance.now() - startTime)
+          executedToolsCache.set(dedupKey, { result: resultText, error: toolError, durationMs })
 
           onEvent({
             taskId,
