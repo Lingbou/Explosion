@@ -213,12 +213,30 @@ export const EditorCenter: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const isComposingRef = useRef(false)
 
-  // Adjust textarea height dynamically to prevent scroll collapse
+  // Local title state: isolates typing from async disk renames, preventing IME corruption & screen flicker
+  const [titleInput, setTitleInput] = useState(currentTitle)
+
+  useEffect(() => {
+    setTitleInput(currentTitle)
+  }, [currentTitle, activeChapterId, activeStoryFile?.relativePath])
+
+  const handleCommitTitle = () => {
+    if (!activeChapter) return
+    const trimmed = titleInput.trim()
+    if (trimmed && trimmed !== currentTitle) {
+      updateChapterTitle(activeChapter.id, trimmed)
+    } else if (!trimmed && currentTitle) {
+      setTitleInput(currentTitle)
+    }
+  }
+
+  // Adjust textarea height dynamically to prevent scroll collapse (fast & lightweight)
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current
     if (!textarea) return
-    const naturalHeight = computeTextareaHeight(textarea)
-    textarea.style.height = `${naturalHeight}px`
+    textarea.style.height = "auto"
+    const nextHeight = Math.max(300, textarea.scrollHeight)
+    textarea.style.height = `${nextHeight}px`
   }
 
   useEffect(() => {
@@ -255,14 +273,13 @@ export const EditorCenter: React.FC = () => {
     }
   }
 
-  // Auto-save debounce effect with paragraph indent normalization
+  // Auto-save debounce effect with paragraph indent normalization (saves cleanly without destroying textarea DOM undo stack)
   useEffect(() => {
     if (!isDirty) return
     const timer = setTimeout(() => {
-      if (currentContent && textareaRef.current) {
+      if (currentContent) {
         const formatted = ensureParagraphIndent(currentContent)
         if (formatted !== currentContent) {
-          textareaRef.current.value = formatted
           updateContent(formatted)
         }
       }
@@ -284,6 +301,12 @@ export const EditorCenter: React.FC = () => {
   // KeyDown: intercept Enter to automatically insert publication-grade Chinese paragraph indent
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (isComposingRef.current || e.nativeEvent.isComposing || e.keyCode === 229) {
+      return
+    }
+
+    if (e.key === "Tab" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault()
+      document.execCommand?.("insertText", false, "\u3000\u3000")
       return
     }
 
@@ -348,27 +371,9 @@ export const EditorCenter: React.FC = () => {
     triggerTypewriterScroll({ smooth: false })
   }
 
-  // Change: ensure first paragraph is indented on first typing (when not deleting)
+  // Pure handleChange: strictly preserves browser native Undo/Redo history stack (Ctrl+Z / Cmd+Z)
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const raw = e.target.value
-    const textarea = textareaRef.current
-    const isDeleting = (e.nativeEvent as any)?.inputType?.startsWith("delete")
-
-    let nextVal = raw
-    if (!isComposingRef.current && !isDeleting && textarea) {
-      const firstNewline = raw.indexOf("\n")
-      const firstLine = firstNewline === -1 ? raw : raw.substring(0, firstNewline)
-      if (firstLine.trim().length > 0 && !firstLine.startsWith("\u3000\u3000")) {
-        const cleaned = firstLine.replace(/^[\s\u3000]+/, "")
-        const rest = firstNewline === -1 ? "" : raw.substring(firstNewline)
-        nextVal = `\u3000\u3000${cleaned}${rest}`
-        const curPos = textarea.selectionStart
-        const newPos = curPos + 2
-        textarea.value = nextVal
-        textarea.setSelectionRange(newPos, newPos)
-      }
-    }
-
+    const nextVal = e.target.value
     updateContent(nextVal)
     adjustTextareaHeight()
     if (!isComposingRef.current) {
@@ -376,25 +381,9 @@ export const EditorCenter: React.FC = () => {
     }
   }
 
-  // CompositionEnd: ensure first paragraph indent if user completed IME composition
+  // CompositionEnd: IME finished composition, adjust height and typewriter scroll safely without DOM value corruption
   const handleCompositionEnd = () => {
     isComposingRef.current = false
-    const textarea = textareaRef.current
-    if (textarea) {
-      const raw = textarea.value
-      const firstNewline = raw.indexOf("\n")
-      const firstLine = firstNewline === -1 ? raw : raw.substring(0, firstNewline)
-      if (firstLine.trim().length > 0 && !firstLine.startsWith("\u3000\u3000")) {
-        const cleaned = firstLine.replace(/^[\s\u3000]+/, "")
-        const rest = firstNewline === -1 ? "" : raw.substring(firstNewline)
-        const nextVal = `\u3000\u3000${cleaned}${rest}`
-        const curPos = textarea.selectionStart
-        const newPos = curPos + 2
-        textarea.value = nextVal
-        textarea.setSelectionRange(newPos, newPos)
-        updateContent(nextVal)
-      }
-    }
     adjustTextareaHeight()
     triggerTypewriterScroll({ smooth: false })
   }
@@ -522,11 +511,13 @@ export const EditorCenter: React.FC = () => {
             ) : (
               <input
                 type="text"
-                value={currentTitle}
-                onChange={(e) => activeChapter && updateChapterTitle(activeChapter.id, e.target.value)}
+                value={titleInput}
+                onChange={(e) => setTitleInput(e.target.value)}
+                onBlur={handleCommitTitle}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing && (e as any).keyCode !== 229) {
                     e.preventDefault()
+                    handleCommitTitle()
                     textareaRef.current?.focus()
                   }
                 }}
